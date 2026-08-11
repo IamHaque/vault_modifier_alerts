@@ -687,3 +687,39 @@ runtime dev-client shows ordinal mismatch.
 
 - Spec sections: §6.3, NFR-7
 - Stories: S10, S11, S12
+
+---
+
+### DEC-015 — Temporary default alert sound: vanilla note block pling
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED (temporary; revert when owner supplies the `.ogg`)
+- **Category:** Scope / Test enablement
+
+**Context**
+The owner has no custom `.ogg` asset available yet (spec §11-1). To make the first manual
+test round (DEC-011) audible without the user editing the generated toml by hand, the
+`soundEvent` config default is set to `minecraft:block.note_block.pling`.
+
+**Decision**
+`VmaClientConfigs.SOUND_EVENT` default = `"minecraft:block.note_block.pling"` while the owner
+has no asset. The registry entry `vault_modifier_alerts:temporal_expired`, `sounds.json` and
+`en_us.json` remain as shipped (S07); playback falls back to the configured event only at
+runtime. When the `.ogg` lands at
+`assets/vault_modifier_alerts/sounds/vault/temporal_expired.ogg`, revert this default to
+`vault_modifier_alerts:temporal_expired` (spec §6.2 default).
+
+**Rationale**
+Audible cue now, zero functional changes to the wiring; the owner can also still override via
+the toml at any time.
+
+**Alternatives considered**
+
+1. Keep spec default and instruct owner to edit the toml — rejected: one more manual step in
+   the test loop.
+2. Bundle a placeholder `.ogg` — rejected: no asset available and licensing uncertainty.
+
+**Impact**
+
+- Spec sections: §6.2 (temporary divergence, reverted later), §11-1
+- Stories: S09, S14

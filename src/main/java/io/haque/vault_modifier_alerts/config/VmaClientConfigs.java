@@ -1,7 +1,6 @@
 package io.haque.vault_modifier_alerts.config;
 
 import com.mojang.logging.LogUtils;
-import io.haque.vault_modifier_alerts.VmaReference;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.common.ForgeConfigSpec;
 import org.slf4j.Logger;
@@ -33,7 +32,7 @@ public final class VmaClientConfigs {
 		EXPIRY_ALERTS_ENABLED = builder.define("enabled", true);
 		WATCHED_MODIFIERS = builder.defineList("watchedModifiers", List.of("the_vault:champion_domain"),
 				VmaClientConfigs::isValidModifierId);
-		SOUND_EVENT = builder.define("soundEvent", VmaReference.MOD_ID + ":" + VmaReference.SOUND_EVENT_ID,
+		SOUND_EVENT = builder.define("soundEvent", "minecraft:block.note_block.pling",
 				VmaClientConfigs::isValidModifierId);
 		VOLUME = builder.defineInRange("volume", 1.0D, 0.0D, 2.0D);
 		PITCH = builder.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
