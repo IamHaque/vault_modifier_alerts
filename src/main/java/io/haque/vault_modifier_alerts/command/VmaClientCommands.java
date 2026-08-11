@@ -37,13 +37,13 @@ public final class VmaClientCommands {
 
 	private static int setDebug(CommandSourceStack source, boolean value) {
 		VmaClientConfigs.setDebugLogging(value);
-		source.sendSuccess(new TextComponent("[VMA] Debug logging " + (value ? "enabled" : "disabled") + " (persists in config)"), false);
+		source.sendSuccess(new TextComponent("[VMA] Debug logging " + (value ? "enabled" : "disabled")), false);
 		return Command.SINGLE_SUCCESS;
 	}
 
 	private static int setSound(CommandSourceStack source, boolean value) {
 		VmaClientConfigs.setAlertSoundEnabled(value);
-		source.sendSuccess(new TextComponent("[VMA] Expiry sounds " + (value ? "enabled" : "disabled") + " (persists in config)"), false);
+		source.sendSuccess(new TextComponent("[VMA] Expiry sounds " + (value ? "enabled" : "disabled")), false);
 		return Command.SINGLE_SUCCESS;
 	}
 
