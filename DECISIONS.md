@@ -71,9 +71,14 @@ Why this option over the alternatives.
 | DEC-002 | Alert scope: configurable watched list                     | RESOLVED | 2026-08-11 |
 | DEC-003 | Alert sound: custom bundled .ogg                           | RESOLVED | 2026-08-11 |
 | DEC-004 | Mod id, display name, package                              | RESOLVED | 2026-08-11 |
-| DEC-005 | Context class exposes time left (verify at implementation) | OPEN     | 2026-08-11 |
+| DEC-005 | Context class exposes time left (verify at implementation) | RESOLVED | 2026-08-11 |
 | DEC-006 | Time-capture fallback hook                                 | OPEN     | 2026-08-11 |
 | DEC-007 | QOLHunters coexistence play-test                           | OPEN     | 2026-08-11 |
+| DEC-008 | Mixins.json entries appear only with their story's class   | RESOLVED | 2026-08-11 |
+| DEC-009 | Dev client loads pack mods from Prism instance             | RESOLVED | 2026-08-11 |
+| DEC-010 | runClient JDK 17.0.18 netty add-opens args                 | RESOLVED | 2026-08-11 |
+| DEC-011 | Runtime testing = user-tests built jar; no runClient       | RESOLVED | 2026-08-11 |
+| DEC-012 | Tracker frame data recorded inside the capture mixin       | RESOLVED | 2026-08-11 |
 
 ---
 
@@ -209,7 +214,7 @@ collisions. Forge requires lowercase alphanumeric ids.
 ### DEC-005 — Context class exposes time left (verify at implementation)
 
 - **Date:** 2026-08-11
-- **Status:** OPEN
+- **Status:** RESOLVED
 - **Category:** Design (verification required)
 
 **Context**
@@ -240,6 +245,63 @@ compile errors.
 
 - Spec sections: §3, §5, §6
 - Stories: S03, S04, S05, S06, S10, S11
+
+---
+
+### DEC-005-R1 — Context class confirmed via javap on the real VH jar (S01 gate)
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED (supersedes sub-entry status of DEC-005)
+- **Category:** Verification record
+
+**Context**
+S01 gate requires every §3.1/§3.2 descriptor to be verified against the actual VH jar before
+any mixin code is written. Verified with `javap -p` (`-c`/`-v` where noted) against the raw
+CurseMaven artifact `vault-hunters-official-mod-458203-7967092.jar`
+(`C:\Users\Haque\.gradle\caches\modules-2\files-2.1\curse.maven\vault-hunters-official-mod-458203\7967092\...jar`).
+
+**Findings (all match spec §3.1/§3.2)**
+
+1. `iskallia.vault.core.vault.Modifiers` — present; `getDisplayGroup()` is an **instance**
+   method returning `it.unimi.dsi.fastutil.objects.Object2IntMap<VaultModifier<?>>`; the local
+   `map` (slot 1) exists in the LocalVariableTable with exact name `map` and signature
+   `Object2IntMap<VaultModifier<?>>` → `@Local(name="map")` resolves.
+2. `iskallia.vault.core.vault.Modifiers$Entry` — nested class name is `Modifiers$Entry`;
+   `getModifier()` → `Optional<VaultModifier<?>>`; `getContext()` → **declared return type**
+   `iskallia.vault.core.vault.modifier.spi.ModifierContext`.
+3. `iskallia.vault.core.vault.modifier.spi.ModifierContext` — has
+   `getTimeLeft()` → `Optional<Integer>` (ticks). NO casts needed in the mixin: declare
+   `ModifierContext context = instance.getContext();`.
+4. The wrap call target `Liskallia/vault/core/vault/Modifiers$Entry;getModifier()Ljava/util/Optional;`
+   exists inside `getDisplayGroup()` (offset 54).
+5. `iskallia.vault.core.vault.overlay.ModifiersRenderer` — static fields
+   `TEXT_BUFFER` (`MultiBufferSource$BufferSource`) and `MODIFIER_TEXT_RENDER_MODE`
+   (`ModifiersRenderer$ModifierTextRenderMode`) present; the 6-arg static overload
+   `renderVaultModifiers(Map<VaultModifier<?>,Integer>, PoseStack, boolean, float, Alignment, boolean)`
+   exists (descriptor matches the spec's mixin string exactly: `ZFLiskallia/vault/util/Alignment;Z`).
+6. `iskallia.vault.core.vault.modifier.spi.VaultModifier<P>` — abstract class; `getId()` →
+   `ResourceLocation`; `getIcon()` → `Optional<ResourceLocation>`.
+7. `iskallia.vault.core.vault.ClientVaults` — static `getActive()` → `Optional<Vault>` (present
+   iff client is inside a vault).
+8. `the_vault`'s `META-INF/mods.toml` declares only **forge** + **minecraft** as mandatory
+   dependencies → dev client runs with Forge + VH only; no extra runtime deps needed for
+   `runClient`.
+
+**Decision**
+Use the verified signatures verbatim for all mixin targets (§5.4A/B, §6.3 Strategy A) and the
+confirmed time-capture expression `context.getTimeLeft()` (returning `Optional<Integer>`),
+used as `context.getTimeLeft().orElse(null)` in `MixinModifiers` per spec §5.4B.
+
+**Rationale**
+Verification against the actual jar (not memory/QOLHunters) satisfies RULES.md §0.3 and the
+S01 gate; all spec descriptors held, so no target-string adjustments were needed.
+
+**Alternatives considered** — none; this is a verification record.
+
+**Impact**
+
+- Spec sections: §3, §5.4, §6.3
+- Stories: S01 (gate), S03, S04, S10
 
 ---
 
@@ -277,6 +339,258 @@ Keeping the fallback documented (rather than discovered mid-implementation) remo
 
 ---
 
+### DEC-008 — Mixins.json entries appear only with their story's mixin class
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED
+- **Category:** Spec deviation (build/launch gate)
+
+**Context**
+Spec §2.4 (S01 DoD) defines `vault_modifier_alerts.mixins.json` with all three mixin entries
+(`tracker.MixinVaultModifier`, `tracker.MixinModifiers`, `render.MixinModifiersRenderer`)
+from day one. But S01 scenario 2 requires `runClient` to launch with **no mixin application
+errors** — and Mixin 0.8.5 with `"required": true` hard-fails at startup when a listed mixin
+class does not exist:
+
+```
+InvalidMixinException: The specified mixin '...tracker.MixinVaultModifier' was not found
+, runClient FAILED
+```
+
+Those classes only arrive at S03 (duck interface), S04 (capture mixin), S10 (renderer mixin).
+
+**Decision**
+`src/main/resources/vault_modifier_alerts.mixins.json` keeps its spec §2.4 structure, but the
+`client` array starts empty and each story (S03, S04, S10) adds its own entry **in the same
+commit** that creates the mixin class. `"minVersion": "0.8"`, `"required": true`,
+`"refmap"` wiring, and the mixin Gradle block stay untouched — the file's final state is
+exactly spec §2.4.
+
+**Rationale**
+Every commit must remain launchable (RULES.md §6 story-sized commits, S01 gate scenario 2).
+Stub mixin classes were rejected (RULES.md §2: no dead code). Deferring the entries is
+zero-risk: mixin application of a listed-but-absent class is the only failure mode, and each
+entry now lands atomically with its class.
+
+**Alternatives considered**
+
+1. Ship all three mixin classes as stubs at S01 — rejected: dead-code violations; every
+   later story would rewrite them.
+2. Set `"required": false` — rejected: would mask genuine target-attach failures in later
+   stories (turns required-errors into warnings).
+3. Keep literal §2.4 and accept runClient crash until S03 — rejected: breaks the S01 gate
+   scenario 2 that this file is meant to serve.
+
+**Impact**
+
+- Spec sections: §2.4 (deviation — final content unchanged)
+- Stories: S01, S03, S04, S10
+
+---
+
+### DEC-009 — Dev client loads pack mods from the Prism instance's mods folder
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED
+- **Category:** Environment (S01 gate scenario 2)
+
+**Context**
+`runClient` with only Forge + `the_vault` on the classpath crashes at model baking:
+`NoClassDefFoundError: top.theillusivec4.curios.api.type.capability.ICurioItem` thrown from
+VH's own `MixinModelBakery` (`assets/the_vault/the_vault.mixins.json`) while loading block
+models. VH 6574 requires its pack ecosystem (Curios etc.) even client-side; the S01 gate
+scenario 2 (client launches with `the_vault`, no mixin errors) therefore needs those mods
+present in the dev run.
+
+**Findings**
+
+- The user's matching environment is the Prism instance `The Vaulters S05 DEV`
+  (`C:\Users\Haque\AppData\Roaming\PrismLauncher\instances\The Vaulters S05 DEV`):
+  Forge **40.3.11** (matches `build.gradle`), `the_vault-1.18.2-3.21.5-remastered.6574.jar`
+  (matches `gradle.properties` `vault_hunters_version=7967092`), plus QOL Hunters 0.42.12
+  and ~207 other pack mods.
+- `run/` is already in `.gitignore`, so dev-only copies never enter the repo.
+
+**Decision**
+Copy all jars from the instance's `minecraft/mods` into the project's `run/mods`, **excluding
+`the_vault*.jar`** (it is already a Gradle `implementation fg.deobf(...)` dependency of the
+dev run; a second copy in `run/mods` would cause a duplicate-mod-id error). This gives the
+dev client the exact pack environment (incl. QOLHunters, which later matters for S13).
+
+**Rationale**
+Copy (not symlink) keeps the dev run independent of the instance's layout and gives a
+reproducible S01/S13 environment; only one further copy step is needed (`DEC-009` note
+below) if `run/mods` is ever wiped.
+
+**Alternatives considered**
+
+1. Copy everything including `the_vault` — rejected: duplicate mod id `the_vault` error at
+   startup (userdev also discovers the classpath dependency).
+2. Pin Curios alone via Gradle — rejected: VH's model path also touches GeckoLib, Mantle,
+   etc.; chasing missing classes one-by-one repeats this crash.
+3. `implementation` of a local `the_vault` on the classpath with a `run/mods` junction —
+   still duplicates `the_vault`; rejected.
+
+**Impact**
+
+- Spec sections: none (dev environment only)
+- Stories: S01 (scenario 2), S13, all later runtime smoke tests
+
+---
+
+### DEC-010 — runClient JVM args for netty reflective access on JDK 17.0.18
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED
+- **Category:** Environment (build infra)
+
+**Context**
+`runClient` crashed in Forge's own `NetworkConstants.<clinit>` (netty 4.1.68 bundled with
+Forge 1.18.2):
+`UnsupportedOperationException: Reflective setAccessible(true) disabled`. Root cause:
+Temurin/Adoptium **JDK 17.0.18** (2026-01 update; 17.0.12+) denies reflective
+`setAccessible(true)` on `jdk.internal.misc.Unsafe` by default, and netty's
+`PlatformDependent0` (loaded as module `io.netty.all` by modlauncher) needs it
+(`IllegalAccessException: java.base does not export jdk.internal.misc to module io.netty.all`).
+
+**Decision**
+Add to the `runs.client` block of `build.gradle` (dev-run only; no effect on the shipped jar
+or on the user's game):
+
+```
+jvmArgs '--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED',
+        '--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED',
+        '--add-opens=java.base/jdk.internal.misc=io.netty.all',
+        '--add-exports=java.base/jdk.internal.misc=io.netty.all',
+        '-Dio.netty.tryReflectionSetAccessible=true'
+```
+
+**Rationale**
+The mod's runtime (player's pack) launches netty on the pack's own JVM config and is
+unaffected; this only makes the Gradle dev client launchable on the machine's current JDK.
+
+**Alternatives considered**
+
+1. Install an older JDK (17.0.x < 17.0.12) — rejected: changing the machine's JDK for one
+   dev-only task; add-opens is the standard netty fix.
+2. `-Dio.netty.noUnsafe=true` alone — rejected: still allowed the module export failure for
+   `io.netty.all`; the exports/opens are the direct fix.
+
+**Impact**
+
+- Spec sections: none (dev environment only)
+- Stories: S01 (scenario 2) and every `runClient` smoke test after it
+
+---
+
+### DEC-011 — Runtime testing: user tests the built jar; no dev-client runs
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED
+- **Category:** Process (owner instruction; replaces RULES.md §8 runtime smoke tests)
+
+**Context**
+The full pack (209 mods) cannot boot under ForgeGradle's parchment dev mapping: multiple pack
+mods (canary, smoothboot, kubejs, botania, …) ship `@Shadow`/`@Overwrite` with hardcoded SRG
+names (`m_36222_` etc.) that do not exist in the dev-mapped runtime, crashing the client
+before the main menu — unrelated to this mod. Iterating removals is a whack-a-mole.
+
+**Decision (owner instruction)**
+`runClient` is **not used for testing at all**. The mod is validated by the owner manually:
+they copy `build/libs/vault_modifier_alerts-<version>.jar` into their pack instance (Prism
+`The Vaulters S05 DEV`) and test in-game. The owner tests "whenever meaningful changes are
+there" and wants advance notice when a test round is needed.
+
+**Consequences**
+
+- The S01 gate's scenario 2 (dev client launch) is satisfied by this decision instead of a
+  runClient run; the rest of S01 DoD stands (`./gradlew build` passes — verified 2026-08-11).
+- RULES.md §8 runtime-smoke-test steps are superseded: every story that touches runtime
+  behaviour ends with "jar built, user notified for manual test" rather than a dev-client run.
+- The copies in `run/` are dev leftovers and are removed (folder stays gitignored); the
+  DEC-010 `jvmArgs` stay in `build.gradle` in case a future dev-client run is ever wanted.
+- The spec's §7 scenario text and RULES.md §8 are not amended file-by-file; this entry is the
+  single source of truth for the deviation (per RULES §9: entry + status update).
+
+**Impact**
+
+- Spec sections: §7 scenario 2 (S01), §7 §8 verification workflows, §9 verification plan
+- Stories: S01 gate, S05–S15 (every runtime-behaviour story)
+- RULES.md: §8 (superseded for runtime tests)
+
+---
+
+### DEC-012 — Frame data recorded inside the capture mixin (buildSnapshot source)
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED
+- **Category:** Spec clarification (design gap in §5.5)
+
+**Context**
+Spec §5.5's `EVALUATE` step needs `newSnapshot = buildSnapshot()` — the "tracked temporal
+modifiers seen this frame (id → time)" — but spec §5.4C's tracker state exposes only
+`lastSnapshot` (previous frame) and gives the tick-side no pointer to the frame's
+`VaultModifier` objects or their duck values. Without a source for the current frame's
+times, the engine has nothing to compare against `lastSnapshot`.
+
+**Decision**
+The capture mixin (`MixinModifiers.vma$captureTimeLeft`) records each seen entry into the
+tracker the moment it runs: `ModifierTracker.recordFrameEntry(modifier.getId(), timeLeft)`,
+writing into a new `currentFrame` map (id → ticks, `null` for "not temporal this frame" —
+explicit absence per §5.4C note). Generation still bumps **once per frame**, done inside
+`recordFrameEntry` when `currentFrame` is empty (first entry of a frame) — this satisfies
+S04's "generation counter increments exactly once per frame with candidates" and is
+equivalent to spec §5.4B's per-entry `markFrameProcessed()` while avoiding N bumps/frame.
+
+**Rationale**
+This is the minimal concrete reading of §5.5's `buildSnapshot()`: the only writer of time
+values is the capture mixin, so the tracker is its natural sink. The tick handler (S05) copies
+`currentFrame` via `consumeFrame()` (copy + clear + mark processed) at evaluation time; the
+map is cleared per frame so an expired modifier that stops appearing becomes absent (fires,
+F1-3/edge 3) rather than lingering.
+
+**Alternatives considered**
+
+1. Store the display-group `Object2IntMap` reference — rejected: it's the HUD's per-frame
+   live object; reading it later is racy/opaque (values are display counts, not ticks).
+2. Re-query `Entry.getContext()` from the tick side — rejected: entries aren't retained.
+
+**Impact**
+
+- Spec sections: §5.4B (tracker call), §5.4C (new `currentFrame` map), §5.5 `buildSnapshot()`
+- Stories: S04, S05
+
+---
+
+### DEC-005-R2 — P2 wrap target bytecode-verified (DEC-006 contingency not needed so far)
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED (record; DEC-006 stays OPEN as in-game attach contingency)
+- **Category:** Verification record
+
+**Context**
+DEC-006 defines a renderer-side capture fallback for the case where P2 (wrap
+`Modifiers.Entry.getModifier()` inside `getDisplayGroup`) cannot attach.
+
+**Findings**
+`javap -c` on `iskallia.vault.core.vault.Modifiers` shows the call
+`Liskallia/vault/core/vault/Modifiers$Entry;getModifier()Ljava/util/Optional;` present at
+offset 54 inside `getDisplayGroup()` (see DEC-005-R1 finding #4). The `@WrapOperation` target
+descriptor and the parenthesis method name both match the spec §5.4B mixin string, so the
+mixin can attach at the bytecode level.
+
+**Decision**
+Proceed with P2 as primary capture. Renderer-side fallback (DEC-006) is not implemented now;
+it remains the documented contingency if in-game test shows P2 not firing (attach happens at
+runtime, after all). No code change required.
+
+**Impact**
+
+- Spec sections: §5.2
+- Stories: S04
+
+---
+
 ### DEC-007 — QOLHunters coexistence play-test
 
 - **Date:** 2026-08-11
@@ -311,25 +625,34 @@ story with owner environment is the cheapest mitigation.
 - Spec sections: §9 (verification plan), §10 (risks), story S13
 - Stories: S13
 
+---
+
+### DEC-013 — sounds.json "name" resolved against README drop path
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED
+- **Category:** Verification record (spec clarification)
+
+**Context**
+Spec §5.3 shows `"name": "vault_modifier_alerts:sounds/temporal_expired"` while stating the
+sound file expectation as `assets/vault_modifier_alerts/sounds/vault/temporal_expired.ogg`
+(with a note claiming the directories match — they do not under any resolve rule). The README
+(§"Custom expiry sound") and DEC-003 fix the authoritative drop path:
+`assets/vault_modifier_alerts/sounds/vault/temporal_expired.ogg`.
+
+**Findings**
+`javap -c` on `Sound.getPath()` (forge-1.18.2-40.3.11_mapped_parchment joined jar) shows it
+builds `new ResourceLocation(getNamespace(), "sounds/" + getPath())` — i.e. the client
+**prepends** `sounds/` to the name's path. Therefore:
+- spec example name `...:sounds/temporal_expired` → `assets/.../sounds/sounds/temporal_expired.ogg` (wrong, double dir);
+- name `vault_modifier_alerts:vault/temporal_expired` → `assets/vault_modifier_alerts/sounds/vault/temporal_expired.ogg` (matches README drop path).
+
 **Decision**
-During Story S13, run a play-test with the real modpack (VH edition + QOLHunters) in a vault
-with a temporal modifier. Validate that: (1) the HUD shows exactly the icons of the active
-modifiers without duplication, (2) expiry alert fires exactly once, (3) no log spam/warnings
-from mixin conflicts. If a conflict appears, record root cause here with DEC-NEW and re-scope
-(possible fallback: gate ordering mixin behind config flag and disable under QOLHunters via a
-detection point, e.g. mod container presence check).
-
-**Rationale**
-Mixin conflicts are the top technical risk of the project (spec §10); an explicit play-test
-story with owner environment is the cheapest mitigation.
-
-**Alternatives considered**
-
-1. Assume coexistence, no test — rejected: spec §10 lists it as risk; too important.
-2. Auto-detect QOLHunters and always disable ordering — rejected: premature, owner runs it but
-   not always enabled.
+`sounds.json` ships `"name": "vault_modifier_alerts:vault/temporal_expired"`. The registered
+`SoundEvent` id stays `vault_modifier_alerts:temporal_expired` (registry id is independent of
+the file path); sounds.json key stays `temporal_expired`.
 
 **Impact**
 
-- Spec sections: §9 (verification plan), §10 (risks), story S13
-- Stories: S13
+- Spec sections: §5.3 (example corrected via decision)
+- Stories: S07

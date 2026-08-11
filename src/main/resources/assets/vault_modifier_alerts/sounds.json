@@ -1,0 +1,10 @@
+{
+  "temporal_expired": {
+    "subtitle": "vault_modifier_alerts.subtitle.temporal_expired",
+    "sounds": [
+      {
+        "name": "vault_modifier_alerts:vault/temporal_expired"
+      }
+    ]
+  }
+}
