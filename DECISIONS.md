@@ -83,6 +83,7 @@ Why this option over the alternatives.
 | DEC-014 | S10: Strategy A applied; class/package alignment corrections | RESOLVED | 2026-08-11 |
 | DEC-015 | Temporary default alert sound: vanilla note block pling     | RESOLVED | 2026-08-11 |
 | DEC-016 | Drop MixinExtras: vanilla @Redirect capture (Option B)      | RESOLVED | 2026-08-12 |
+| DEC-017 | @Redirect handler must be non-static (instance target)      | RESOLVED | 2026-08-12 |
 
 ---
 
@@ -818,5 +819,46 @@ records) and record a follow-up DEC.
 - Build: `build.gradle` loses two dependency lines; installable jar becomes the single thin
   `vault_modifier_alerts-0.1.0.jar`; README install step unchanged (it already names the
   plain jar)
+
+---
+
+### DEC-017 — `@Redirect` handler must be non-static (instance target)
+
+- **Date:** 2026-08-12
+- **Status:** RESOLVED
+- **Category:** Verification record (bug fix from first in-game launch)
+
+**Context**
+First in-game launch of the `feature/drop-mixinextras` branch crashed during mod loading:
+`InvalidInjectionException: 'static' modifier of handler method does not match target` while
+applying `tracker.MixinModifiers` to `iskallia/vault/core/vault/Modifiers::getDisplayGroup`.
+
+**Findings**
+- `getDisplayGroup()` is an **instance** (non-static) method — verified with `javap` against
+  both the dev jar (`vault-hunters-official-mod-458203-7967092.jar`) and the runtime jar the
+  owner tests with (`the_vault-1.18.2-20.0.3-remastered.6872.jar` in the "Vault Hunters Third
+  Edition - Remastered" Prism instance).
+- Vanilla `@Redirect` enforces matching staticness between handler and target method.
+  `@WrapOperation` (MixinExtras, previous implementation) tolerated a static handler, so the
+  pattern carried over verbatim — which the stock injector rejects.
+- `ModifiersRenderer.renderVaultModifiers(...)` 6-arg overload is **static** in both jars,
+  and `MixinModifiersRenderer`'s `@ModifyVariable` handler is static — unaffected.
+- `MixinVaultModifier` performs no method injection — unaffected.
+
+**Decision**
+`vma$captureTimeLeft` becomes a non-static (instance) handler; first parameter stays the
+target instance (`Modifiers.Entry`). Spec §5.4 B snippet corrected to match. All other
+injection/plumbing unchanged (DEC-016 capture semantics preserved: unconditional raw capture,
+F2-7 alignment, frame recording).
+
+**Impact**
+
+- Spec sections: §5.4 B (snippet corrected + staticness note added)
+- Stories: S04
+- Test note: this launch also confirms the owner's runtime instance is "Vault Hunters Third
+  Edition - Remastered" (`the_vault` 20.0.3-remastered.6872); the verified §3 target shapes
+  are identical in both jars, so DEC-005-R1 descriptors apply to both environments.
+
+---
 
 ---

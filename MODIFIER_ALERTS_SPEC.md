@@ -395,7 +395,7 @@ public abstract class MixinModifiers {
     @Redirect(method = "getDisplayGroup",
         at = @At(value = "INVOKE",
                  target = "Liskallia/vault/core/vault/Modifiers$Entry;getModifier()Ljava/util/Optional;"))
-    private static Optional<VaultModifier<?>> vma$captureTimeLeft(Modifiers.Entry instance) {
+    private Optional<VaultModifier<?>> vma$captureTimeLeft(Modifiers.Entry instance) {
 
         Optional<VaultModifier<?>> result = instance.getModifier();
         VaultModifier<?> modifier = result.orElse(null);
@@ -413,6 +413,9 @@ public abstract class MixinModifiers {
 - The `getModifier()` INVOKE has exactly one call site in `getDisplayGroup` (DEC-005-R1), so a
   `@Redirect` is equivalent to a `@WrapOperation` here; the returned `Optional` is passed
   through unchanged. MixinExtras is **not** a dependency (DEC-016).
+- The handler must be a **non-static (instance) method**: `getDisplayGroup()` is an instance
+  method and vanilla Mixin enforces matching staticness (DEC-017; unlike `@WrapOperation`,
+  which tolerated a static handler).
 - The duck time mirrors the raw context value every frame; no `containsKey` reset and no
   bounded-decrease guard (subsumed by unconditional capture — DEC-016).
 - This redirect runs once per entry per `getDisplayGroup()` call. If VH builds the display

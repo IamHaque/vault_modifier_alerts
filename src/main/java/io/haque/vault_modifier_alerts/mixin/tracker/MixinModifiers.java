@@ -17,7 +17,7 @@ public abstract class MixinModifiers {
 	@Redirect(method = "getDisplayGroup",
 			at = @At(value = "INVOKE",
 					target = "Liskallia/vault/core/vault/Modifiers$Entry;getModifier()Ljava/util/Optional;"))
-	private static Optional<VaultModifier<?>> vma$captureTimeLeft(Modifiers.Entry instance) {
+	private Optional<VaultModifier<?>> vma$captureTimeLeft(Modifiers.Entry instance) {
 
 		Optional<VaultModifier<?>> result = instance.getModifier();
 		VaultModifier<?> modifier = result.orElse(null);
