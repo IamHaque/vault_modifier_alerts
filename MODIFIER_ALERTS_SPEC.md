@@ -65,7 +65,6 @@ This mod adds two features:
 | Mappings                                    | Parchment `2022.11.06-1.18.2` (channel `parchment`, version `2022.11.06-1.18.2`)                                                                             |
 | Java toolchain                              | 17                                                                                                                                                           |
 | Mixin                                       | `org.spongepowered:mixin:0.8.5:processor` (annotationProcessor)                                                                                              |
-| MixinExtras                                 | `io.github.llamalad7:mixinextras-common:0.4.1` (compileOnly + annotationProcessor), `io.github.llamalad7:mixinextras-forge:0.4.1` (jarJar, range `[0.4.1,)`) |
 | Vault Hunters (dev dep)                     | curse maven `curse.maven:vault-hunters-official-mod-458203:<vault_hunters_version>` with `fg.deobf`                                                          |
 | `vault_hunters_version` (gradle.properties) | `7967092`                                                                                                                                                    |
 | Optional gradle plugin (mirrors QOLHunters) | `com.radimous.vh-addon-dev` version `0.3.6`                                                                                                                  |
@@ -82,8 +81,7 @@ Mirror the structure proven by **QOLHunters** (`build.gradle`), trimmed to this 
   - `minecraft 'net.minecraftforge:forge:1.18.2-40.3.11'`
   - `implementation fg.deobf("curse.maven:vault-hunters-official-mod-458203:${vault_hunters_version}")`
   - `annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'`
-  - `compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))`
-  - `implementation(jarJar("io.github.llamalad7:mixinextras-forge:0.4.1")) { jarJar.ranged(it, "[0.4.1,)") }`
+- No MixinExtras dependency (DEC-016): capture uses stock `@Redirect` only.
 - `processResources` expands `${mod_version}` into `META-INF/mods.toml` (property `mod_version`, default `0.1.0`).
 - `minecraft { runs { client { workingDirectory project.file('run'); ... mods { vault_modifier_alerts { source sourceSets.main } } } } }`
 - `jar.finalizedBy('reobfJar')`.
@@ -179,6 +177,10 @@ _(Class names must match §5.2 exactly if you keep the default layout.)_
 | P2  | `mixin/temporalmodifiertimer/MixinModifiersRenderer.java` | `@Mixin(value = ModifiersRenderer.class, remap = false)`; `@Inject(method = "renderVaultModifiers(Ljava/util/Map;Lcom/mojang/blaze3d/vertex/PoseStack;ZFLiskallia/vault/util/Alignment;Z)V", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/VertexConsumer;endVertex()V", ordinal = 3, shift = At.Shift.AFTER, remap = true))`; captures the per-item locals listed in §3.1. |
 | P3  | `mixin/temporalmodifiertimer/MixinVaultModifier.java`     | `@Mixin(VaultModifier.class)` (plain — QOLHunters uses default remap here) implementing a duck-typed interface via `@Unique` fields/methods.                                                                                                                                                                                                                                                  |
 | P4  | `mixin/vaultmodifiers/MixinModifiersRenderer.java`        | Same class/method as P2 with `@Redirect` on `VaultModifier.getIcon()`. (Not needed by this mod; listed to prove coexistence.)                                                                                                                                                                                                                                                                 |
+
+> P1 describes the **reference's** capture. This mod's capture deviates: vanilla `@Redirect` on
+> the same target, no `@Local map`, no MixinExtras — see DEC-016 (the `getModifier()` INVOKE has
+> a single call site, so `@Redirect` is equivalent here).
 
 **First implementation step (S01/S04 gate): confirm all descriptors above in your dev
 environment; any deviation → DEC entry + adjust the target strings, keeping the injection
@@ -382,49 +384,40 @@ public abstract class MixinVaultModifier implements VaultModifierTimeAccessor {
 > Mixin `@Unique` members are renamed at runtime to avoid collisions (QOLHunters' identically
 > named members coexist — both mods installed together is supported, see S13).
 
-**B. Capture during `Modifiers.getDisplayGroup()`** (mirrors QOLHunters P1):
+**B. Capture during `Modifiers.getDisplayGroup()`** (vanilla `@Redirect` — deviates from the
+QOLHunters P1 mirror per **DEC-016**):
 
 ```java
 // io.haque.vault_modifier_alerts.mixin.tracker.MixinModifiers
 @Mixin(value = Modifiers.class, remap = false)
 public abstract class MixinModifiers {
 
-    @WrapOperation(method = "getDisplayGroup",
+    @Redirect(method = "getDisplayGroup",
         at = @At(value = "INVOKE",
                  target = "Liskallia/vault/core/vault/Modifiers$Entry;getModifier()Ljava/util/Optional;"))
-    private static Optional<VaultModifier<?>> vma$captureTimeLeft(Modifiers.Entry instance,
-            Operation<Optional<VaultModifier<?>>> original,
-            @Local(name = "map") Object2IntMap<VaultModifier<?>> map) {
+    private static Optional<VaultModifier<?>> vma$captureTimeLeft(Modifiers.Entry instance) {
 
-        Optional<VaultModifier<?>> result = original.call(instance);
+        Optional<VaultModifier<?>> result = instance.getModifier();
         VaultModifier<?> modifier = result.orElse(null);
         if (modifier instanceof VaultModifierTimeAccessor accessor) {
-            if (!map.containsKey(modifier)) {
-                accessor.vma$setTimeLeft(null);          // new frame / not displayed → reset
-            }
-            Object context = instance.getContext();       // verify exact type in dev env
-            if (context != null) {
-                Integer timeLeft = /* context.getTimeLeft() */ Optional.empty().orElse(null);
-                if (timeLeft != null && (accessor.vma$getTimeLeft() == null
-                        || accessor.vma$getTimeLeft() <= 0 || timeLeft < accessor.vma$getTimeLeft())) {
-                    accessor.vma$setTimeLeft(timeLeft);   // keep shortest observed
-                }
-            } else {
-                accessor.vma$setTimeLeft(null);           // no context ⇒ not temporal this frame
-            }
-            ModifierTracker.getInstance().markFrameProcessed();   // bump generation
+            ModifierContext context = instance.getContext();      // verified: spi.ModifierContext
+            Integer timeLeft = context != null ? context.getTimeLeft().orElse(null) : null;
+            accessor.vma$setTimeLeft(timeLeft);                   // unconditional (DEC-016, F2-7)
+            ModifierTracker.getInstance().recordFrameEntry(modifier.getId(), timeLeft);
         }
         return result;
     }
 }
 ```
 
-- The comment `/* context.getTimeLeft() */` line is a placeholder for the **verified** call:
-  QOLHunters uses `ctx.getTimeLeft()` returning `Optional<Integer>` (ticks). Confirm the
-  context class name when inspecting `Modifiers.Entry`; keep semantics identical. Record the
-  confirmed expression in `DECISIONS.md` (DEC entry).
-- This wrap runs once per entry per `getDisplayGroup()` call. If VH builds the display group
-  once per render frame (as QOLHunters' timers imply), time values stay fresh each frame.
+- The `getModifier()` INVOKE has exactly one call site in `getDisplayGroup` (DEC-005-R1), so a
+  `@Redirect` is equivalent to a `@WrapOperation` here; the returned `Optional` is passed
+  through unchanged. MixinExtras is **not** a dependency (DEC-016).
+- The duck time mirrors the raw context value every frame; no `containsKey` reset and no
+  bounded-decrease guard (subsumed by unconditional capture — DEC-016).
+- This redirect runs once per entry per `getDisplayGroup()` call. If VH builds the display
+  group once per render frame (as QOLHunters' timers imply), time values stay fresh each
+  frame.
 
 **C. Tracker state** (`ModifierTracker`):
 
@@ -596,7 +589,8 @@ private static Set<Map.Entry<VaultModifier<?>, Integer>> vma$sortedEntries(
 
 **Strategy C (last resort).** If the renderer does **not** receive the display map directly (e.g.
 it receives a `List` or iterates a converted collection — inspect the decompiled method), wrap the
-**collection expression** the method iterates with a `@WrapOperation` (MixinExtras) that returns
+**collection expression** the method iterates with a `@WrapOperation` (**requires re-adding the
+MixinExtras dependency removed in DEC-016 — record that follow-up DEC**) that returns
 `ModifierOrdering.reorder(...)`'s equivalent collection, and update `ModifierOrdering` to reorder
 that collection type. Document the adjusted shape in `DECISIONS.md`. The **ordering contract
 (F2-2/F2-3/F2-4) never changes** — only the plumbing.

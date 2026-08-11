@@ -79,6 +79,10 @@ Why this option over the alternatives.
 | DEC-010 | runClient JDK 17.0.18 netty add-opens args                 | RESOLVED | 2026-08-11 |
 | DEC-011 | Runtime testing = user-tests built jar; no runClient       | RESOLVED | 2026-08-11 |
 | DEC-012 | Tracker frame data recorded inside the capture mixin       | RESOLVED | 2026-08-11 |
+| DEC-013 | sounds.json "name" resolved against README drop path        | RESOLVED | 2026-08-11 |
+| DEC-014 | S10: Strategy A applied; class/package alignment corrections | RESOLVED | 2026-08-11 |
+| DEC-015 | Temporary default alert sound: vanilla note block pling     | RESOLVED | 2026-08-11 |
+| DEC-016 | Drop MixinExtras: vanilla @Redirect capture (Option B)      | RESOLVED | 2026-08-12 |
 
 ---
 
@@ -723,3 +727,96 @@ the toml at any time.
 
 - Spec sections: §6.2 (temporary divergence, reverted later), §11-1
 - Stories: S09, S14
+
+---
+
+### DEC-016 — Drop MixinExtras: vanilla `@Redirect` capture (Option B)
+
+- **Date:** 2026-08-12
+- **Status:** RESOLVED
+- **Category:** Design / Build
+
+**Context**
+The S04 capture mixin originally used MixinExtras (`@WrapOperation` + `@Local(name = "map")`),
+mirroring QOLHunters P1 (DEC-005-R2). That required an extra dependency (`mixinextras-forge`
+0.4.1) bundled at runtime via jarJar, inflating the jar (~180 KB nested module) and adding a
+second mixin framework to the classpath. The `getModifier()` INVOKE in
+`Modifiers.getDisplayGroup()` has exactly **one call site** (offset 54, DEC-005-R1), so the
+capture is implementable with stock Mixin as a vanilla `@Redirect`.
+
+**Findings**
+- `@Redirect` handler receives the target instance as its first parameter and must call the
+  redirected method itself — same JVM-stack shape as `@WrapOperation` for this single-call-site
+  case; the returned `Optional` is passed through unchanged, so the renderer sees identical
+  values.
+- The only MixinExtras feature in use, `@Local(name = "map")`, exists to reset the duck time
+  when a modifier is not yet in the display map. That reset is equivalent to setting the duck
+  time to the raw context value every call, because an entry's `getModifier()` runs in the same
+  loop iteration in which the modifier is added to the map.
+- QOLHunters 0.42.12 bundles `META-INF/jarjar/mixinextras-forge-0.4.1.jar` itself; it is a
+  consumer, not a provider of MixinExtras to other mods. Removing our dependency therefore
+  cannot break QOLHunters' own mixins (coexistence parity kept — S13). Note the reference's
+  duck-update guards only protect its text-renderer, not alert detection.
+
+**Decision**
+Replace `MixinModifiers`' `@WrapOperation` with a vanilla `@Redirect` on the same target
+(`Liskallia/vault/core/vault/Modifiers$Entry;getModifier()Ljava/util/Optional;`). Capture rule
+(owner-approved F2-7 alignment):
+
+- `timeLeft = context != null ? context.getTimeLeft().orElse(null) : null`
+- duck time set **unconditionally**: `accessor.vma$setTimeLeft(timeLeft)`
+- frame entry recorded with the same raw value:
+  `ModifierTracker.recordFrameEntry(modifier.getId(), timeLeft)`
+
+Remove the mixinextras dependencies from `build.gradle` (annotationProcessor `-common` and
+jarJar `-forge` lines). `MixinModifiersRenderer` already uses stock
+`@ModifyVariable` (DEC-014 Strategy A) and stays untouched. Result: ~22 KB jar, no `-all.jar`,
+no nested `META-INF/jarjar/`, and the requirement to install the fat jar disappears.
+
+**Behavior deltas vs the previous implementation**
+
+1. F2-7 fix: a modifier still shown on the HUD whose context stops reporting a countdown
+   (e.g. became permanent) is now treated as **permanent for that frame**; the old code
+   retained a stale positive countdown indefinitely — a latent spec deviation now closed.
+2. Fresh-frame reset (`!map.containsKey` → null) is subsumed: the first `getModifier()` call
+   for a modifier sets its duck to the raw value anyway.
+3. Bounded-decrease guard (`timeLeft < current`) is dropped; the vault's own display map and
+   QOLHunters read the same `getTimeLeft()` each frame, so a still-active countdown is
+   re-reported every frame — the guard only masked same-frame staleness.
+
+**F1 expiry impact (traced, no change in stable paths)**
+Snapshot values recorded are identical in every stable path: the snapshot/`isActive`/one-shot
+logic compares transitions (`> 0` → `0`-or-absent). Natural expiry either reports
+`Optional.of(0)` (recorded as 0 → inactive) or the entry disappears (`getModifier()` not
+called → absent this frame → inactive); both fire exactly as before.
+
+**Known edge (documented, mitigated)**
+If `getTimeLeft()` ever transiently returned empty *while a countdown was still alive*, the
+new code records `null` for that frame (old code retained the last value): one spurious alert,
+recovered by `reArm` on the next active frame (DEC-012 semantics). The same read would make
+QOLHunters' countdown text flicker, which does not occur in practice — this mod consumes the
+same source. **Mitigation:** if a spurious fire is ever observed while a countdown still
+renders, restore the bounded-decrease guard on the duck update (F1 stays authoritative on raw
+records) and record a follow-up DEC.
+
+**Alternatives considered**
+
+1. Keep `@WrapOperation` + jarJar and only swap jar classifiers (single-jar naming) —
+   rejected: keeps a second mixin framework + nested module for one call-site wrap; jar grew
+   ~180 KB and the install story stayed complicated.
+2. `@Redirect` with the old guard preserved and no map — rejected: leaves the F2-7
+   deviation in place; owner approved closing it.
+3. `@Inject` at HEAD of `getDisplayGroup` + re-reading entries — rejected: duplicates the
+   loop work and loses per-entry ordering context.
+
+**Impact**
+
+- Spec sections: §2.1/§2.2 (MixinExtras dependency row + snippet removed), §3.2 (P1 note
+  added: deviation from reference), §5.4 B (capture snippet replaced), §6.3 (Strategy C
+  requires re-adding the dependency)
+- Stories: S04 (capture mechanism), S14 (build surface); all others unaffected
+- Build: `build.gradle` loses two dependency lines; installable jar becomes the single thin
+  `vault_modifier_alerts-0.1.0.jar`; README install step unchanged (it already names the
+  plain jar)
+
+---

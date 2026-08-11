@@ -119,10 +119,11 @@ io.haque.vault_modifier_alerts
 - All cross-mod compat: this mod targets the VH jar (`the_vault`). QOLHunters may also patch
   the same classes. Rules:
   1. Keep injected locals minimal and reference-safe (guard against missing entries).
-  2. Prefer `@Local` named capture (e.g. `@Local(name="map")`) over positional where both are
-     available — more resilient to unrelated code changes.
-  3. Never remove/redirect-ignore an existing call that other code relies on; either
-     `@WrapOperation` on the exact call or inject after `endVertex`.
+  2. Capture with stock Mixin (`@Redirect`/`@Inject`) on verified single-call-site targets.
+     Named-local capture (`@Local`) is only available if MixinExtras is ever re-added
+     (removed per DEC-016).
+  3. Never remove/redirect-ignore an existing call that other code relies on; use `@Redirect`
+     on the exact call or inject after a control point (`endVertex`).
   4. Mixin method names use the `vma$` prefix for `@Unique` members and `on...`/`modify...`
      verbs for injection targets.
   5. No cross-mixin state: if two mixins must share data, they communicate via the owned
