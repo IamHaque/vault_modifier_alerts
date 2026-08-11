@@ -1,0 +1,89 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net' }
+        maven { url = 'https://maven.parchmentmc.org' }
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
+        classpath 'org.parchmentmc:librarian:1.+'
+        classpath group: 'org.spongepowered', name: 'mixingradle', version: '0.7-SNAPSHOT'
+    }
+}
+plugins {
+    id 'maven-publish'
+}
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'org.parchmentmc.librarian.forgegradle'
+apply plugin: 'org.spongepowered.mixin'
+
+mixin {
+    add sourceSets.main, "vault_modifier_alerts.refmap.json"
+    config "vault_modifier_alerts.mixins.json"
+}
+
+version = mod_version
+group = 'io.haque.vault_modifier_alerts'
+archivesBaseName = 'vault_modifier_alerts'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'parchment', version: '2022.11.06-1.18.2'
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+
+            property 'forge.logging.markers', 'REGISTRIES'
+
+            property 'forge.logging.console.level', 'debug'
+
+            // netty 4.1.68 (bundled in Forge 1.18.2) needs reflective access to
+            // jdk.internal.misc.Unsafe, which newer JDK 17 builds (>= 17.0.12) deny
+            // by default -> re-open it for the dev client only.
+            jvmArgs '--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED',
+                    '--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED',
+                    '--add-opens=java.base/jdk.internal.misc=io.netty.all',
+                    '--add-exports=java.base/jdk.internal.misc=io.netty.all',
+                    '-Dio.netty.tryReflectionSetAccessible=true'
+
+            mods {
+                vault_modifier_alerts {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    maven { url = 'https://maven.minecraftforge.net' }
+    maven { url = 'https://cursemaven.com' }
+    flatDir {
+        dir 'libs'
+    }
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.18.2-40.3.11'
+    implementation fg.deobf("curse.maven:vault-hunters-official-mod-458203:${vault_hunters_version}")
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
+    implementation(jarJar("io.github.llamalad7:mixinextras-forge:0.4.1")) {
+        jarJar.ranged(it, "[0.4.1,)")
+    }
+}
+
+processResources {
+    def replaceProperties = [
+            mod_version: mod_version
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+jar.finalizedBy('reobfJar')

@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="[40,)"
+license="MIT"
+[[mods]]
+modId="vault_modifier_alerts"
+version="${mod_version}"
+displayName="Vault Modifier Alerts"
+authors="(user)"
+description='''Audio alert when watched temporal vault modifiers expire,
+and HUD sorting of temporal modifiers first.'''
+clientSideOnly=true
+
+[[dependencies.vault_modifier_alerts]]
+    modId="the_vault"
+    mandatory=true
+    versionRange="[1.0.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.vault_modifier_alerts]]
+    modId="forge"
+    mandatory=true
+    versionRange="[40,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.vault_modifier_alerts]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.18.2,1.19)"
+    ordering="NONE"
+    side="BOTH"

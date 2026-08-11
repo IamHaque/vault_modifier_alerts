@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "io.haque.vault_modifier_alerts.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "vault_modifier_alerts.refmap.json",
+  "client": [
+    "tracker.MixinVaultModifier",
+    "tracker.MixinModifiers",
+    "render.MixinModifiersRenderer"
+  ],
+  "minVersion": "0.8"
+}
