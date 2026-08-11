@@ -21,6 +21,10 @@ public final class ExpiryAlertEngine {
 	public void evaluate() {
 		ModifierTracker tracker = ModifierTracker.getInstance();
 		Map<ResourceLocation, Integer> newSnapshot = tracker.consumeFrame();
+		if (VmaClientConfigs.isDebugLogging()) {
+			VaultModifierAlerts.LOGGER.debug("[VMA] Frame captured: generation {}, {} entries",
+					tracker.getGeneration(), newSnapshot.size());
+		}
 		for (String watchedId : VmaClientConfigs.watchedModifiers()) {
 			ResourceLocation id = ResourceLocation.tryParse(watchedId);
 			if (id == null) {
@@ -28,6 +32,9 @@ public final class ExpiryAlertEngine {
 			}
 			boolean prevActive = isActive(tracker.getLastSnapshot(), id);
 			boolean currActive = isActive(newSnapshot, id);
+			if (prevActive != currActive && VmaClientConfigs.isDebugLogging()) {
+				VaultModifierAlerts.LOGGER.debug("[VMA] Watch {} state {} -> {}", id, prevActive, currActive);
+			}
 			if (prevActive && !currActive) {
 				fire(id);
 			} else if (currActive) {

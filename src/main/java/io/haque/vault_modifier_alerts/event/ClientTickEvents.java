@@ -5,11 +5,14 @@ import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.expiry.ExpiryAlertEngine;
 import io.haque.vault_modifier_alerts.tracker.ModifierTracker;
 import iskallia.vault.core.vault.ClientVaults;
+import iskallia.vault.core.vault.Vault;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+
+import java.util.Optional;
 
 @Mod.EventBusSubscriber(modid = VmaReference.MOD_ID, value = Dist.CLIENT)
 public final class ClientTickEvents {
@@ -30,7 +33,8 @@ public final class ClientTickEvents {
 			return;
 		}
 		ModifierTracker tracker = ModifierTracker.getInstance();
-		boolean inVaultNow = ClientVaults.getActive().isPresent();
+		Optional<Vault> active = ClientVaults.getActive();
+		boolean inVaultNow = active != null && active.isPresent();
 		if (inVaultNow != tracker.isInVault()) {
 			tracker.resetSession(inVaultNow, VmaClientConfigs.GRACE_PERIOD_TICKS.get(), minecraft.player.tickCount);
 			return;

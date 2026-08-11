@@ -37,6 +37,10 @@ public final class ModifierTracker {
 		return generation != lastProcessedGeneration;
 	}
 
+	public long getGeneration() {
+		return generation;
+	}
+
 	public Map<ResourceLocation, Integer> consumeFrame() {
 		Map<ResourceLocation, Integer> snapshot = new HashMap<>(currentFrame);
 		currentFrame.clear();
