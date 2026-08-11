@@ -1,5 +1,6 @@
 package io.haque.vault_modifier_alerts.config;
 
+import com.electronwill.nightconfig.core.Config;
 import com.mojang.logging.LogUtils;
 import io.haque.vault_modifier_alerts.VmaReference;
 import net.minecraft.resources.ResourceLocation;
@@ -18,7 +19,7 @@ public final class VmaClientConfigs {
 
 	public static final ForgeConfigSpec.BooleanValue EXPIRY_ALERTS_ENABLED;
 	public static final ForgeConfigSpec.ConfigValue<List<? extends String>> WATCHED_MODIFIERS;
-	public static final ForgeConfigSpec.ConfigValue<Map<String, String>> SOUND_OVERRIDES;
+	public static final ForgeConfigSpec.ConfigValue<Config> SOUND_OVERRIDES;
 	public static final ForgeConfigSpec.DoubleValue VOLUME;
 	public static final ForgeConfigSpec.DoubleValue PITCH;
 	public static final ForgeConfigSpec.IntValue GRACE_PERIOD_TICKS;
@@ -34,8 +35,9 @@ public final class VmaClientConfigs {
 		EXPIRY_ALERTS_ENABLED = builder.define("enabled", true);
 		WATCHED_MODIFIERS = builder.defineList("watchedModifiers", List.of("the_vault:champion_domain"),
 				VmaClientConfigs::isValidModifierId);
-		SOUND_OVERRIDES = builder.define("soundOverrides",
-				Map.of(VmaReference.CHAMPION_DOMAIN_ID, VmaReference.SOUND_EVENT_NAMESPACED),
+		Config defaultOverrides = Config.inMemory();
+		defaultOverrides.set(VmaReference.CHAMPION_DOMAIN_ID, VmaReference.SOUND_EVENT_NAMESPACED);
+		SOUND_OVERRIDES = builder.define("soundOverrides", defaultOverrides,
 				VmaClientConfigs::isValidSoundOverrideMap);
 		VOLUME = builder.defineInRange("volume", 1.0D, 0.0D, 2.0D);
 		PITCH = builder.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
@@ -78,7 +80,7 @@ public final class VmaClientConfigs {
 		return result;
 	}
 
-	public static String resolveSoundEventId(ResourceLocation modifierId) {
+public static String resolveSoundEventId(ResourceLocation modifierId) {
 		return SOUND_OVERRIDES.get().get(modifierId.toString());
 	}
 
