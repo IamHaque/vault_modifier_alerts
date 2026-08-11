@@ -19,7 +19,7 @@ public final class VaultModifierAlerts {
 	public static final String MOD_ID = VmaReference.MOD_ID;
 	public static final Logger LOGGER = LogUtils.getLogger();
 
-	private VaultModifierAlerts() {
+	public VaultModifierAlerts() {
 		IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
 
 		DeferredRegister<SoundEvent> sounds = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MOD_ID);
