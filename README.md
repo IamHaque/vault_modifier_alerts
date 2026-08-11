@@ -39,18 +39,25 @@ cd C:\Users\Haque\Development\VH\vault_modifier_alerts
 ./gradlew runClient      # dev client with VH
 ```
 
-## Custom expiry sound (user-supplied asset)
+## Expiry sounds (per-modifier, owner-supplied)
 
-The mod ships a custom sound event `vault_modifier_alerts:temporal_expired` that plays on
-temporal-modifier expiry. **You supply the audio file:**
+Each watched modifier needs its **own** sound entry under the config key `soundOverrides`
+(there is no generic default sound). The mod ships one override:
 
 ```
-src/main/resources/assets/vault_modifier_alerts/sounds/vault/temporal_expired.ogg
+"the_vault:champion_domain"  →  "vault_modifier_alerts:champ_domain_expired"
 ```
 
-Place a short (~0.5–1 s) `.ogg` (Vorbis, 44.1 kHz stereo or mono) at that path before building.
-Until the file exists the mod still builds/plays silently; the sound event and playback code must
-be implemented and guarded per SPEC §6.3 regardless.
+whose asset ships in the jar at:
+
+```
+src/main/resources/assets/vault_modifier_alerts/sounds/vault/champ_domain_expired.ogg
+```
+
+Files must be OGG **Vorbis** (not Opus), ~44.1 kHz, ideally ≤ 2 s. To watch a new modifier,
+add it to `watchedModifiers` **and** map it to a registered sound event in `soundOverrides`
+inside the generated `config/vault_modifier_alerts-client.toml`; a watch without an entry
+warns once and stays silent.
 
 ---
 

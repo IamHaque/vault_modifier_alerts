@@ -286,7 +286,7 @@ src/main/resources/
 └── assets/vault_modifier_alerts/
     ├── sounds.json
     ├── lang/en_us.json
-    └── sounds/vault/temporal_expired.ogg   ← USER-SUPPLIED asset (empty/missing OK to build)
+    └── sounds/vault/champ_domain_expired.ogg   ← USER-SUPPLIED asset (shipped as of DEC-018)
 ```
 
 ### 4.3 Threading & data flow
@@ -326,7 +326,7 @@ Group **`[Expiry Alerts]`** (ForgeConfigSpec `push("Expiry Alerts")`):
 | ------------------ | -------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `enabled`          | boolean        | `true`                                     | –                                                                                                  | Master switch for F1.                                                                |
 | `watchedModifiers` | List\<String\> | `["the_vault:champion_domain"]`            | `defineList(..., obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null)` | Watched modifier ids. Invalid entries filtered at read-time with a warn log.         |
-| `soundEvent`       | String         | `"vault_modifier_alerts:temporal_expired"` | ResourceLocation-parseable                                                                         | Sound to play on expiry. May point to any registered sound (incl. `minecraft:*`).    |
+| `soundOverrides`   | Map\<String,String\> | `{"the_vault:champion_domain": "vault_modifier_alerts:champ_domain_expired"}` | keys/values ResourceLocation-parseable | Per-modifier sound — **required for every watched modifier** (no generic default; missing entry → warn-once + silent). |
 | `volume`           | double         | `1.0`                                      | `[0.0, 2.0]`                                                                                       | Playback volume.                                                                     |
 | `pitch`            | double         | `1.0`                                      | `[0.5, 2.0]`                                                                                       | Playback pitch.                                                                      |
 | `gracePeriodTicks` | int            | `20`                                       | `[0, 200]`                                                                                         | Silence window after vault entry (no expiry evaluation).                             |
@@ -335,25 +335,25 @@ Group **`[Expiry Alerts]`** (ForgeConfigSpec `push("Expiry Alerts")`):
 ### 5.3 Sound asset + registry
 
 - Register a custom `SoundEvent` via `DeferredRegister<SoundEvent>` (namespace
-  `vault_modifier_alerts`), `SoundEvent` id `temporal_expired` (registered name
-  `vault_modifier_alerts:temporal_expired`).
+  `vault_modifier_alerts`), `SoundEvent` id `champ_domain_expired` (registered name
+  `vault_modifier_alerts:champ_domain_expired`).
 - `assets/vault_modifier_alerts/sounds.json`:
 
   ```json
   {
-    "temporal_expired": {
-      "subtitle": "vault_modifier_alerts.subtitle.temporal_expired",
-      "sounds": [{ "name": "vault_modifier_alerts:sounds/temporal_expired" }]
+    "champ_domain_expired": {
+      "subtitle": "vault_modifier_alerts.subtitle.champ_domain_expired",
+      "sounds": [{ "name": "vault_modifier_alerts:vault/champ_domain_expired" }]
     }
   }
   ```
 
-  (Sound file expectation: `assets/vault_modifier_alerts/sounds/vault/temporal_expired.ogg` —
-  note the directory segment matches the `"name"`'s path after the namespace; it is
-  **user-supplied** and may be absent without breaking the build.)
+  (Sound file: `assets/vault_modifier_alerts/sounds/vault/champ_domain_expired.ogg` — the
+  `"name"`'s path segment after the namespace must match the subdirectory (DEC-013); supplied
+  by the owner, shipped as of DEC-018.)
 
 - `assets/vault_modifier_alerts/lang/en_us.json`:
-  `{ "vault_modifier_alerts.subtitle.temporal_expired": "Temporal modifier expired" }`
+  `{ "vault_modifier_alerts.subtitle.champ_domain_expired": "Champion's Domain expired" }`
 - `AlertSoundPlayer.resolve(SoundEvent)` guards:
   - Event registry lookup `ForgeRegistries.SOUND_EVENTS.getValue(id)`; if `null` → log
     **one error** (rate-limited) and no-op. `sound.json` presence does not register the event;
@@ -476,7 +476,9 @@ isActive  (map, id): same predicate (id not present ⇒ not active)
 fire(id):
   if (tracker.fired.contains(id)) return                      // one-shot
   tracker.fired.add(id)
-  AlertSoundPlayer.play(Config.soundEvent, Config.volume, Config.pitch, id)
+  sound = Config.soundOverrides[id]                           // override-only (DEC-018)
+  if (sound == null) { warn-once; return }                    // misconfigured watch -> silent, no repeat warn
+  AlertSoundPlayer.play(sound, Config.volume, Config.pitch, id)
   if (Config.debugLogging) LOGGER.debug("[VMA] Temporal modifier {} expired; alert fired", id)
 ```
 
@@ -494,9 +496,16 @@ Edge-case semantics (must hold):
 6. **Modifier unpaused** — if the game is paused, ticks do not advance; nothing fires while
    paused because tick events don't run. (Accepted behavior; no special handling.)
 
-### 5.6 《Per-modifier sound overrides》
+### 5.6 Per-modifier sound overrides
 
-**Out of scope** for v1 (see §12 Open Items). v1 uses one global sound for all watched ids.
+**The only sound source** (DEC-018, owner request): every watched modifier must have its own
+sound, so there is **no generic `soundEvent` default**. Config key `soundOverrides`
+(Map, §5.2), default `{ "the_vault:champion_domain":
+"vault_modifier_alerts:champ_domain_expired" }`. Resolution per expiry event equals
+`SOUND_OVERRIDES[modifierId]`; a missing entry logs a **warn once** per modifier id and stays
+silent (F1-8 config-driven). Implemented in `VmaClientConfigs.resolveSoundEventId(...)` +
+`ExpiryAlertEngine.fire(...)`; `AlertSoundPlayer` stays a single DRY entry point (unchanged
+signature).
 
 ---
 
@@ -729,11 +738,11 @@ Critical path: **S01 → S03 → S04 → S05 → S06 → S08 → S09** (F1) and
 - **Priority:** Must — **Feature:** SOUND — **Depends on:** S01
 - **Scenarios**
   1. Given the mod loads; When the sound registries finish;
-     Then `ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("vault_modifier_alerts","temporal_expired"))` is non-null.
+     Then `ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("vault_modifier_alerts","champ_domain_expired"))` is non-null.
   2. Given the user's `.ogg` absent; When the mod builds and runs;
      Then no crash occurs and playback is silent (guarded).
   3. Given the `.ogg` present at the documented path; When the client runs;
-     Then `/playsound vault_modifier_alerts:temporal_expired master @s` (or equivalent in-game
+     Then `/playsound vault_modifier_alerts:champ_domain_expired master @s` (or equivalent in-game
      command) produces audio.
 - **DoD:** DeferredRegister wired into `VaultModifierAlerts` constructor; `sounds.json` +
   `en_us.json` included; guards per §5.3.
@@ -744,7 +753,7 @@ Critical path: **S01 → S03 → S04 → S05 → S06 → S08 → S09** (F1) and
 - **Scenarios**
   1. Given an expiry event; When `AlertSoundPlayer.play(...)` runs;
      Then `SoundManager.play(SimpleSoundInstance.forUI(soundEvent, volume, pitch))` is called on the client thread.
-  2. Given `soundEvent` configured to an unregistered id; When `play(...)` runs;
+  2. Given an override mapped to an unregistered id; When `play(...)` runs;
      Then exactly one error-level log appears and the call no-ops.
   3. Given `volume=0`; When `play(...)` runs; Then no audible output and no exception.
 - **DoD:** `<PlayerTickEvent/TickEvent>` → engine → sound path proven end-to-end
@@ -754,8 +763,9 @@ Critical path: **S01 → S03 → S04 → S05 → S06 → S08 → S09** (F1) and
 
 - **Priority:** Must — **Feature:** CONFIG/ALERT — **Depends on:** S08, S02
 - **Scenarios**
-  1. Given `watchedModifiers = ["the_vault:champion_domain"]` and `soundEvent = "minecraft:block.note_block.pling"`;
-     When Champion's Domain expires in-vault; Then the note-block sound plays (pitch/volume from config).
+  1. Given `watchedModifiers = ["the_vault:champion_domain"]` and its `soundOverrides` entry
+     (bundled Champ's Domain cue); When Champion's Domain expires in-vault;
+     Then the bundled sound plays (pitch/volume from config).
   2. Given `watchedModifiers = []`; When any temporal modifier expires;
      Then nothing plays.
   3. Given `gracePeriodTicks = 0` and a modifier mid-countdown at entry;
@@ -816,9 +826,9 @@ Critical path: **S01 → S03 → S04 → S05 → S06 → S08 → S09** (F1) and
 - **Priority:** Must — **Feature:** ROBUST — **Depends on:** S09, S12
 - **Scenarios**
   1. Given the `.ogg` asset missing; When expiry fires; Then no crash, silent no-op + one warn log.
-  2. Given malformed `soundEvent` in the toml; When the engine starts;
-     Then config load does not crash (validator rejects), and playback falls back to no-op with
-     an error log.
+  2. Given a watched id with no `soundOverrides` entry (or a malformed override map in the toml);
+     When the engine runs; Then config load does not crash (validator rejects), and that watch
+     stays silent with one warn log.
   3. Given `the_vault` updates its config dump (e.g. new modifier ids); When a watched id is
      unknown; Then nothing special happens — unknown ids simply never match.
   4. Given `ClientVaults.getActive()` unavailable in an edge state (null-free defensive check);
@@ -886,18 +896,26 @@ Perform after S09 and S12 respectively; results + screenshots/notes go to `DECIS
 | `getDisplayGroup()` not called each frame           | Low          | Tracker is generation-gated; F1 evaluation catches any snapshot change; worst case alert latency = one frame. Also capture time-left in the F2 mixin as a secondary hook if measurements show otherwise (record in DECISIONS.md; keep both features functional with one capture path). |
 | Strategy A mixin (param modify) rejected at runtime | Low          | Fallbacks B/C in §6.3; contract unchanged.                                                                                                                                                                                                                                             |
 | QOLHunters co-installed behaves differently         | Med          | S13 play-test; both mods proven on the same jar lineage; if a conflict appears, wrap/re-route via decision + optional `minecraft.client.properties`-free runtime check `ModList.get().isLoaded("qolhunters")`.                                                                         |
-| User's `.ogg` missing/inaudible                     | Certain (v1) | Guarded playback + config can point anywhere (`soundEvent`); README documents drop path.                                                                                                                                                                                               |
+| User's `.ogg` missing/inaudible per override        | Certain (v1) | Watched id without a `soundOverrides` entry logs wonce + is silent; guarded `AlertSoundPlayer` (rate-limited error); README documents drop paths. |
 | New VH modifier ids unknown to config               | Low          | Unknown ids never match; ordering handles by time-absence (F2-7).                                                                                                                                                                                                                      |
 
 ---
 
 ## 11. Assumptions & Open Items
 
-1. **`.ogg` supply** — the product owner provides `src/main/resources/assets/vault_modifier_alerts/sounds/vault/temporal_expired.ogg`. Until then, playback is silent but wired (S07/S08/S14).
-2. **Context class name** — the exact type returned by `Modifiers.Entry.getContext()` (with `getTimeLeft()`) is confirmed during S01/S04 and recorded as DEC-005.
-3. **Per-modifier sounds** — explicitly **out of scope** for v1; a `Map<modifierId → sound>` override is a clean v2 extension of `AlertSoundPlayer` (DRY: single player entry point).
-4. **Vault "world vs crystal" modifiers** — both permanent and temporal lists come from the same `Modifiers` mechanism; no special-casing of source. If testing shows companion temporals aren't present in `getDisplayGroup` on your setup, switch the capture hook to the F2 mixin path (see §10 risk row 2) and log DEC-006.
-5. **Mod author/display metadata** — fill `authors` in `mods.toml` with the product owner's name/handle.
+1. **`.ogg` supply** — shipped as of DEC-018:
+   `src/main/resources/assets/vault_modifier_alerts/sounds/vault/champ_domain_expired.ogg`
+   (Vorbis, 44.1 kHz, stereo, ~1.31 s), wired to the Champion's Domain override only.
+2. **Context class name** — the exact type returned by `Modifiers.Entry.getContext()` (with
+   `getTimeLeft()`) is confirmed during S01/S04 and recorded as DEC-005.
+3. **Per-modifier sounds** — in scope for v1 via `soundOverrides` (DEC-018); only
+   Champion's Domain ships a bundled override.
+4. **Vault "world vs crystal" modifiers** — both permanent and temporal lists come from the
+   same `Modifiers` mechanism; no special-casing of source. If testing shows companion
+   temporals aren't present in `getDisplayGroup` on your setup, switch the capture hook to the
+   F2 mixin path (see §10 risk row 2) and log DEC-006.
+5. **Mod author/display metadata** — fill `authors` in `mods.toml` with the product owner's
+   name/handle.
 
 ---
 
@@ -912,22 +930,3 @@ Perform after S09 and S12 respectively; results + screenshots/notes go to `DECIS
 | Vault Hunters Official Wiki                    | https://wiki.vaulthunters.gg/ (Vault Champion, Vault Companions, Temporal Relic pages)                                 |
 | VH config dump (id verification)               | `C:\Users\Haque\Development\VH\the_vault\vault_modifiers.json`, `companion_relics.json`, `vault_modifier_overlay.json` |
 | HUD overlay layout values                      | `vault_modifier_overlay.json` (columns 5 / size 16 / spacing 5 / margins 8·4)                                          |
-lt/temporal_expired.ogg`. Until then, playback is silent but wired (S07/S08/S14).
-2. **Context class name** — the exact type returned by `Modifiers.Entry.getContext()` (with `getTimeLeft()`) is confirmed during S01/S04 and recorded as DEC-005.
-3. **Per-modifier sounds** — explicitly **out of scope** for v1; a `Map<modifierId → sound>` override is a clean v2 extension of `AlertSoundPlayer` (DRY: single player entry point).
-4. **Vault "world vs crystal" modifiers** — both permanent and temporal lists come from the same `Modifiers` mechanism; no special-casing of source. If testing shows companion temporals aren't present in `getDisplayGroup` on your setup, switch the capture hook to the F2 mixin path (see §10 risk row 2) and log DEC-006.
-5. **Mod author/display metadata** — fill `authors` in `mods.toml` with the product owner's name/handle.
-
----
-
-## 12. References
-
-| Ref | Link |
-| --- | --- |
-| QOLHunters (reference implementation) | <https://github.com/IridiumIO/QOLHunters> |
-| — `temporalmodifiertimer` files | `src/main/java/io/iridium/qolhunters/{features,mixin}/temporalmodifiertimer/*` |
-| — `vaultmodifiers` mixins | `src/main/java/io/iridium/qolhunters/mixin/vaultmodifiers/MixinModifiersRenderer.java` |
-| — build.gradle / mods.toml / gradle.properties | repo root |
-| Vault Hunters Official Wiki | <https://wiki.vaulthunters.gg/> (Vault Champion, Vault Companions, Temporal Relic pages) |
-| VH config dump (id verification) | `C:\Users\Haque\Development\VH\the_vault\vault_modifiers.json`, `companion_relics.json`, `vault_modifier_overlay.json` |
-| HUD overlay layout values | `vault_modifier_overlay.json` (columns 5 / size 16 / spacing 5 / margins 8·4) |

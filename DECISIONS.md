@@ -84,6 +84,7 @@ Why this option over the alternatives.
 | DEC-015 | Temporary default alert sound: vanilla note block pling     | RESOLVED | 2026-08-11 |
 | DEC-016 | Drop MixinExtras: vanilla @Redirect capture (Option B)      | RESOLVED | 2026-08-12 |
 | DEC-017 | @Redirect handler must be non-static (instance target)      | RESOLVED | 2026-08-12 |
+| DEC-018 | Bundled Champ's Domain sound + per-modifier overrides       | RESOLVED | 2026-08-12 |
 
 ---
 
@@ -698,7 +699,8 @@ runtime dev-client shows ordinal mismatch.
 ### DEC-015 — Temporary default alert sound: vanilla note block pling
 
 - **Date:** 2026-08-11
-- **Status:** RESOLVED (temporary; revert when owner supplies the `.ogg`)
+- **Status:** RESOLVED — fully superseded by DEC-018 (2026-08-12): the generic `soundEvent`
+  config key was removed; sounds are per-modifier `soundOverrides` only.
 - **Category:** Scope / Test enablement
 
 **Context**
@@ -858,6 +860,56 @@ F2-7 alignment, frame recording).
 - Test note: this launch also confirms the owner's runtime instance is "Vault Hunters Third
   Edition - Remastered" (`the_vault` 20.0.3-remastered.6872); the verified §3 target shapes
   are identical in both jars, so DEC-005-R1 descriptors apply to both environments.
+
+---
+
+### DEC-018 — Bundled Champion's Domain sound + per-modifier sound overrides
+
+- **Date:** 2026-08-12
+- **Status:** RESOLVED
+- **Category:** Scope / Design
+
+**Context**
+The owner supplied an audio asset for the alert (a meme clip extracted from an MP4, trimmed and
+normalized to ~1.31 s) and scoped it explicitly: the sound plays **only** for **Champion's
+Domain** temporal expiration. Renamed `champ_domain_expired.ogg` accordingly.
+
+**Findings (asset validation)**
+`champ_domain_expired.ogg` (15,516 bytes): Ogg container (`OggS` magic), **Vorbis** codec
+(not Opus — MC 1.18.2's OpenAL plays Vorbis only), 44,100 Hz, stereo, last-page granule
+57,600 samples → ~1.31 s. Meets spec §5.3 requirements; mono conversion unnecessary.
+
+**Decision**
+1. Sound event id renamed `temporal_expired` → **`champ_domain_expired`** (registry id, sounds.json
+   key, subtitle key follow; sounds.json name `vault_modifier_alerts:vault/champ_domain_expired`
+   resolves to the asset per the DEC-013 rule). The generic `temporal_expired` event is removed.
+2. Per-modifier sound overrides implemented at v1 (previously spec §5.6/§11-3 "v2 only"): new
+   client config `soundOverrides: Map<modifierId, soundEvent>`, default
+   `{ "the_vault:champion_domain": "vault_modifier_alerts:champ_domain_expired" }`. Resolution:
+   override for the firing modifier id wins, else generic `soundEvent`.
+3. **DEC-015 fully superseded** — the generic `soundEvent` config key is **removed entirely**
+   (pled default pling and the temporary-test rationale are gone). Sound resolution is
+   **override-only**: every watched modifier must carry its own `soundOverrides` entry (i.e.
+   its own .ogg-backed event) or the expiration stays silent with a warn-once log
+   (misconfiguration surfaces, never a wrong sound).
+4. `ExpiryAlertEngine.fire` resolves per id via
+   `VmaClientConfigs.resolveSoundEventId(modifierId)` (nullable; null → warn-once + suppress);
+   `AlertSoundPlayer` API unchanged (single DRY entry point).
+
+**Alternatives considered**
+
+1. Rename asset to `temporal_expired.ogg` and keep one global event — rejected: would play the
+   Champ's Domain cue for every watched id, contradicting the owner's scoping.
+2. Hard-code "champion_domain → champ sound" in code — rejected: violates F1-8
+   (config-driven), and the map generalizes cleanly to future mods' sounds.
+
+**Impact**
+
+- Spec sections: §4.1, §5.2 (default + new `soundOverrides` row), §5.3, §5.6 (promoted),
+  §7.8 (S07 ids), §11-1/§11-3 (updated), §12 tail corruption fixed (duplicated §11/§12 block)
+- Stories: S07 (id), S09/S14 (config surface: generic `soundEvent` removed), README updated
+- Config note: existing `vault_modifier_alerts-client.toml` in the pack keeps old values; the
+  test round must delete it (or it keeps the pling for champion domain too)
 
 ---
 

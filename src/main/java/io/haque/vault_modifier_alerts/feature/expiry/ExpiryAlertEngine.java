@@ -5,7 +5,9 @@ import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.tracker.ModifierTracker;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public final class ExpiryAlertEngine {
 
@@ -44,13 +46,24 @@ public final class ExpiryAlertEngine {
 		tracker.setLastSnapshot(newSnapshot);
 	}
 
+	private static final Set<ResourceLocation> missingOverrideLogged = new HashSet<>();
+
 	private static void fire(ResourceLocation id) {
 		ModifierTracker tracker = ModifierTracker.getInstance();
 		if (tracker.isFired(id)) {
 			return;
 		}
 		tracker.markFired(id);
-		AlertSoundPlayer.play(VmaClientConfigs.SOUND_EVENT.get(), VmaClientConfigs.VOLUME.get(),
+		String soundEventId = VmaClientConfigs.resolveSoundEventId(id);
+		if (soundEventId == null) {
+			if (missingOverrideLogged.add(id)) {
+				VaultModifierAlerts.LOGGER.warn(
+						"[VMA] Watched modifier {} has no soundOverrides entry; alert suppressed " +
+								"(add a soundOverrides pair with its own .ogg sound)", id);
+			}
+			return;
+		}
+		AlertSoundPlayer.play(soundEventId, VmaClientConfigs.VOLUME.get(),
 				VmaClientConfigs.PITCH.get(), id);
 		if (VmaClientConfigs.isDebugLogging()) {
 			VaultModifierAlerts.LOGGER.debug("[VMA] Temporal modifier {} expired; alert fired", id);

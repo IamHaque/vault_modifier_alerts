@@ -1,12 +1,14 @@
 package io.haque.vault_modifier_alerts.config;
 
 import com.mojang.logging.LogUtils;
+import io.haque.vault_modifier_alerts.VmaReference;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.common.ForgeConfigSpec;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public final class VmaClientConfigs {
 
@@ -16,7 +18,7 @@ public final class VmaClientConfigs {
 
 	public static final ForgeConfigSpec.BooleanValue EXPIRY_ALERTS_ENABLED;
 	public static final ForgeConfigSpec.ConfigValue<List<? extends String>> WATCHED_MODIFIERS;
-	public static final ForgeConfigSpec.ConfigValue<String> SOUND_EVENT;
+	public static final ForgeConfigSpec.ConfigValue<Map<String, String>> SOUND_OVERRIDES;
 	public static final ForgeConfigSpec.DoubleValue VOLUME;
 	public static final ForgeConfigSpec.DoubleValue PITCH;
 	public static final ForgeConfigSpec.IntValue GRACE_PERIOD_TICKS;
@@ -32,8 +34,9 @@ public final class VmaClientConfigs {
 		EXPIRY_ALERTS_ENABLED = builder.define("enabled", true);
 		WATCHED_MODIFIERS = builder.defineList("watchedModifiers", List.of("the_vault:champion_domain"),
 				VmaClientConfigs::isValidModifierId);
-		SOUND_EVENT = builder.define("soundEvent", "minecraft:block.note_block.pling",
-				VmaClientConfigs::isValidModifierId);
+		SOUND_OVERRIDES = builder.define("soundOverrides",
+				Map.of(VmaReference.CHAMPION_DOMAIN_ID, VmaReference.SOUND_EVENT_NAMESPACED),
+				VmaClientConfigs::isValidSoundOverrideMap);
 		VOLUME = builder.defineInRange("volume", 1.0D, 0.0D, 2.0D);
 		PITCH = builder.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
 		GRACE_PERIOD_TICKS = builder.defineInRange("gracePeriodTicks", 20, 0, 200);
@@ -75,7 +78,26 @@ public final class VmaClientConfigs {
 		return result;
 	}
 
+	public static String resolveSoundEventId(ResourceLocation modifierId) {
+		return SOUND_OVERRIDES.get().get(modifierId.toString());
+	}
+
 	private static boolean isValidModifierId(Object value) {
 		return value instanceof String s && ResourceLocation.tryParse(s) != null;
+	}
+
+	private static boolean isValidSoundOverrideMap(Object value) {
+		if (!(value instanceof Map<?, ?> map)) {
+			return false;
+		}
+		for (Map.Entry<?, ?> entry : map.entrySet()) {
+			if (!(entry.getKey() instanceof String key) || ResourceLocation.tryParse(key) == null) {
+				return false;
+			}
+			if (!(entry.getValue() instanceof String sound) || ResourceLocation.tryParse(sound) == null) {
+				return false;
+			}
+		}
+		return true;
 	}
 }

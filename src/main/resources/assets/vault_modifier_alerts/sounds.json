@@ -1,9 +1,9 @@
 {
-  "temporal_expired": {
-    "subtitle": "vault_modifier_alerts.subtitle.temporal_expired",
+  "champ_domain_expired": {
+    "subtitle": "vault_modifier_alerts.subtitle.champ_domain_expired",
     "sounds": [
       {
-        "name": "vault_modifier_alerts:vault/temporal_expired"
+        "name": "vault_modifier_alerts:vault/champ_domain_expired"
       }
     ]
   }
