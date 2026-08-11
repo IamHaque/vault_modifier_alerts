@@ -54,6 +54,13 @@ public final class ExpiryAlertEngine {
 			return;
 		}
 		tracker.markFired(id);
+		if (!VmaClientConfigs.isAlertSoundEnabled()) {
+			if (VmaClientConfigs.isDebugLogging()) {
+				VaultModifierAlerts.LOGGER.debug(
+						"[VMA] Temporal modifier {} expired; sound suppressed (alertSoundEnabled=false)", id);
+			}
+			return;
+		}
 		String soundEventId = VmaClientConfigs.resolveSoundEventId(id);
 		if (soundEventId == null) {
 			if (missingOverrideLogged.add(id)) {

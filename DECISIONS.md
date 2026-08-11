@@ -85,6 +85,8 @@ Why this option over the alternatives.
 | DEC-016 | Drop MixinExtras: vanilla @Redirect capture (Option B)      | RESOLVED | 2026-08-12 |
 | DEC-017 | @Redirect handler must be non-static (instance target)      | RESOLVED | 2026-08-12 |
 | DEC-018 | Bundled Champ's Domain sound + per-modifier overrides       | RESOLVED | 2026-08-12 |
+| DEC-019 | Client commands for debug + sound toggles                   | RESOLVED | 2026-08-12 |
+| DEC-020 | F2 order = anti-anchor edge (permanents first, temporals last) | RESOLVED | 2026-08-12 |
 
 ---
 
@@ -910,6 +912,92 @@ Domain** temporal expiration. Renamed `champ_domain_expired.ogg` accordingly.
 - Stories: S07 (id), S09/S14 (config surface: generic `soundEvent` removed), README updated
 - Config note: existing `vault_modifier_alerts-client.toml` in the pack keeps old values; the
   test round must delete it (or it keeps the pling for champion domain too)
+
+---
+
+### DEC-019 — Client commands for debug + sound toggles
+
+- **Date:** 2026-08-12
+- **Status:** RESOLVED
+- **Category:** Scope / Design
+
+**Context**
+The owner asked for in-game commands to toggle debug logging and expiry sounds (reporting the F2
+ordering issue and wanting a sound kill-switch while testing). `debugLogging` existed in the toml
+but required a restart to edit; `alertSoundEnabled` did not exist.
+
+**Findings (API availability)**
+Forge 1.18.2-40.3.11 provides `net.minecraftforge.client.event.RegisterClientCommandsEvent`
+(FORGE bus, client dist) with `getDispatcher()` returning
+`CommandDispatcher<CommandSourceStack>`, plus `net.minecraftforge.client.ClientCommandSourceStack
+extends CommandSourceStack`. Verified via `javap` on `forge-1.18.2-40.3.11-universal.jar`.
+Client commands execute in both single-player and multiplayer via Forge's client command handler.
+
+**Decision**
+1. New `command/VmaClientCommands` (`@Mod.EventBusSubscriber(Dist.CLIENT, Bus.FORGE)`), registering
+   under literal `vma`:
+   - `/vma debug on|off` → writes existing `debugLogging`.
+   - `/vma sound on|off` → writes new config `alertSoundEnabled` (default `true`,
+     `[Expiry Alerts]`), read by `ExpiryAlertEngine.fire` before playback (fired-marking still
+     happens; missing-override warn is independent of the master switch).
+   - `/vma status` → config state, last HUD order (via `ModifierOrdering.getLastOrdered()`),
+     vault/frame state, per-watched-id ticks + sound override.
+2. Toggles are config-backed (ForgeConfigSpec `.set()`); Forge persists them on game exit —
+   the owner confirmed persistence is desired.
+3. `ModifierOrdering` now records the last ordered id list (volatile, debug-support only).
+
+**Impact**
+- Spec: §5.2 (`alertSoundEnabled` row), new §7.17 S16 story, §14 tests 11–13; README commands
+  table
+- Stories: S16 (new), S15 (diagnostics vehicle)
+- Config note: `alertSoundEnabled` missing in an existing toml is auto-added by Forge on save
+
+---
+
+### DEC-020 — F2 order = anti-anchor edge (permanents first, temporals last)
+
+- **Date:** 2026-08-12
+- **Status:** RESOLVED
+- **Category:** Design (supersedes DEC-001's ordering direction)
+- **Relates to:** DEC-001 (original sort order), DEC-014
+
+**Context**
+The owner reported on the in-game HUD (Vault Hunters 3rd Edition - Remastered) that temporal
+modifiers were "not shown first / at the top" — a mismatch between expected and actual layout.
+Bytecode-verified facts about the remastered HUD module (`VaultModifiersModule`,
+`iskallia.vault.client.render.hud.module.vault`):
+- The HUD map is built per frame from `Modifiers.getDisplayGroup()` (+ favours + influences) —
+  our `MixinModifiers` capture redirect fires on this exact path (verified: `Modifiers$Entry`
+  has `getContext()`, the `Entry.getModifier()` redirect site exists at the expected offset).
+- The module renders via `ModifiersRenderer.renderVaultModifiers(Map, PoseStack, boolean, float,
+  Alignment, boolean)` — exactly the 6-arg method our `MixinModifiersRenderer` reorders.
+- The `Alignment` comes from `ModOptions.VAULT_MODIFIERS_ALIGNMENT` (default
+  `new Alignment(RIGHT, BOTTOM)`; the overlay config file is NOT used by this module).
+- The renderer fills rows row-major from the anchor: `BOTTOM` → index 0 draws on the **bottom**
+  row, `TOP` → index 0 on the top row. First map entries sit adjacent to the anchor.
+
+**Conclusion**
+The ordering code was already applying (sound fired on the old jar → capture pipeline alive),
+so "temporals first" landed on the **bottom** row of the bottom-anchored HUD — which reads
+top-down as "permanents before temporals". This is a layout/expectation mismatch, not a broken
+reorder.
+
+**Decision**
+Per the owner's explicit placement request ("temporal modifiers … shown at BOTTOM when TOP
+alignment is selected and TOP priority when BOTTOM is selected"), temporals move to the
+**anti-anchor edge**: map order = **permanents first (vanilla relative order), temporal bucket
+last** (sorted by time within the bucket per `sortTemporalAscending`). Because the renderer
+fills from the anchor, "last in map order" lands on the block's outer row under BOTH vertical
+alignments — the owner's rule holds without touching the vanilla renderer or horizontal
+alignment. `ModifierOrdering.reorder` is updated accordingly (pass 1 permanents, pass 2 sorted
+temporals; key→value pairing preserved; `size()<2`/disabled guards unchanged).
+
+**Impact**
+- Spec: §6.1 F2-1/F2-2/F2-3 (order direction), §6.3 snippet, §7.12 S11 scenario, §14 test 6;
+  README F2 row; DEC-001's *order direction* is superseded for the HUD output (the time-sort
+  comparator semantics remain configurable)
+- Config: unchanged keys (`sortTemporalAscending` still applies inside the temporal bucket)
+- Diagnostics: `/vma status` (DEC-019) exposes the exact applied order for verification
 
 ---
 

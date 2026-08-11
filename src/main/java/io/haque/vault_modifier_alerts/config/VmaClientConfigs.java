@@ -22,6 +22,7 @@ public final class VmaClientConfigs {
 	public static final ForgeConfigSpec.ConfigValue<Config> SOUND_OVERRIDES;
 	public static final ForgeConfigSpec.DoubleValue VOLUME;
 	public static final ForgeConfigSpec.DoubleValue PITCH;
+	public static final ForgeConfigSpec.BooleanValue ALERT_SOUND_ENABLED;
 	public static final ForgeConfigSpec.IntValue GRACE_PERIOD_TICKS;
 	public static final ForgeConfigSpec.BooleanValue DEBUG_LOGGING;
 
@@ -41,6 +42,7 @@ public final class VmaClientConfigs {
 				VmaClientConfigs::isValidSoundOverrideMap);
 		VOLUME = builder.defineInRange("volume", 1.0D, 0.0D, 2.0D);
 		PITCH = builder.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
+		ALERT_SOUND_ENABLED = builder.define("alertSoundEnabled", true);
 		GRACE_PERIOD_TICKS = builder.defineInRange("gracePeriodTicks", 20, 0, 200);
 		DEBUG_LOGGING = builder.define("debugLogging", false);
 		builder.pop();
@@ -62,6 +64,18 @@ public final class VmaClientConfigs {
 
 	public static boolean isDebugLogging() {
 		return DEBUG_LOGGING.get();
+	}
+
+	public static boolean isAlertSoundEnabled() {
+		return ALERT_SOUND_ENABLED.get();
+	}
+
+	public static void setDebugLogging(boolean value) {
+		DEBUG_LOGGING.set(value);
+	}
+
+	public static void setAlertSoundEnabled(boolean value) {
+		ALERT_SOUND_ENABLED.set(value);
 	}
 
 	public static boolean isHudOrderingEnabled() {

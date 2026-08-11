@@ -15,7 +15,7 @@
 > - Where a section says _"verify in your dev environment"_, open the relevant decompiled
 >   class (the VH jar is deobfuscated by ForgeGradle in your dev workspace), confirm the value,
 >   and **record the finding in `DECISIONS.md`** (per `RULES.md §13`).
-> - Every story S01–S15 has a Definition of Done. Implement stories in dependency order
+> - Every story S01–S16 has a Definition of Done. Implement stories in dependency order
 >   (see §8.1). The dependency order **is** the recommended implementation order.
 > - If you believe something in this spec is wrong, do not silently change it: stop, log a
 >   decision entry (DEC), and implement the safest behavior described in the story instead.
@@ -329,6 +329,7 @@ Group **`[Expiry Alerts]`** (ForgeConfigSpec `push("Expiry Alerts")`):
 | `soundOverrides`   | Map\<String,String\> | `{"the_vault:champion_domain": "vault_modifier_alerts:champ_domain_expired"}` | keys/values ResourceLocation-parseable | Per-modifier sound — **required for every watched modifier** (no generic default; missing entry → warn-once + silent). |
 | `volume`           | double         | `1.0`                                      | `[0.0, 2.0]`                                                                                       | Playback volume.                                                                     |
 | `pitch`            | double         | `1.0`                                      | `[0.5, 2.0]`                                                                                       | Playback pitch.                                                                      |
+| `alertSoundEnabled` | boolean        | `true`                                     | –                                                                                                  | Master switch for expiry audio; written by `/vma sound on\|off` (DEC-019).             |
 | `gracePeriodTicks` | int            | `20`                                       | `[0, 200]`                                                                                         | Silence window after vault entry (no expiry evaluation).                             |
 | `debugLogging`     | boolean        | `false`                                    | –                                                                                                  | When `true`, log every snapshot transition + fire decision at DEBUG level (see §11). |
 
@@ -515,9 +516,9 @@ signature).
 
 | ID   | Requirement                                                                                                                                                                                                                |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F2-1 | Modifier icons rendered by `ModifiersRenderer.renderVaultModifiers` appear in the order defined by the `group` map's iteration. Ordered result: **temporal first, permanent last**.                                        |
-| F2-2 | Temporal modifiers (time-left measured as in §5.4) are sorted by remaining ticks, **ascending (soonest-expiring first = "most urgent" leftmost)**. Tie-break: original (VH) insertion order — the sort must be **stable**. |
-| F2-3 | Permanent modifiers (no time-left) follow, preserving their original relative order.                                                                                                                                       |
+| F2-1 | Modifier icons rendered by `ModifiersRenderer.renderVaultModifiers` appear in the order defined by the `group` map's iteration. Ordered result: **permanent first, temporal last** — see DEC-020 (anti-anchor edge placement). |
+| F2-2 | Temporal modifiers (time-left measured as in §5.4) are sorted by remaining ticks within the temporal bucket — **ascending (soonest-expiring first) when `sortTemporalAscending=true`**. Tie-break: original (VH) insertion order — the sort must be **stable**. |
+| F2-3 | Permanent modifiers (no time-left) lead the list, preserving their original relative order. |
 | F2-4 | Every map entry keeps its **key→value** pairing (value = the `Integer` amount used by the renderer text overlay).                                                                                                          |
 | F2-5 | Ordering applies **only when** `hudOrdering.enabled = true`; otherwise the map passes through unchanged.                                                                                                                   |
 | F2-6 | Ordering must not affect: icon texture, countdown overlay rendering (QOLHunters timer text if installed), or any server/network state.                                                                                     |
@@ -563,15 +564,15 @@ public static Map<VaultModifier<?>, Integer> reorder(Map<VaultModifier<?>, Integ
         return group;
     }
     LinkedHashMap<VaultModifier<?>, Integer> result = new LinkedHashMap<>(group.size());
-    // 1. temporal bucket
+    // 1. permanent bucket first (stable: stream of original LinkedHashMap preserves encounter order)
+    group.forEach((m, c) -> { if (!isTemporal(m)) result.put(m, c); });
+    // 2. temporal bucket last (anti-anchor edge, DEC-020)
     group.entrySet().stream()
         .filter(e -> isTemporal(e.getKey()))
         .sorted(VmaClientConfigs.HUD_ORDERING_ASCENDING.get()
                 ? Comparator.comparingInt(e -> timeOf(e.getKey()))
                 : Comparator.comparingInt(e -> timeOf(e.getKey())).reversed())
         .forEach(e -> result.put(e.getKey(), e.getValue()));
-    // 2. permanent bucket (stable: stream of original LinkedHashMap preserves encounter order)
-    group.forEach(result::putIfAbsent);        // ensures order + value preservation
     return result;
 }
 
@@ -583,8 +584,8 @@ static int timeOf(VaultModifier<?> m) { return ((VaultModifierTimeAccessor) m).v
 ```
 
 > `Stream.sorted` on a `LinkedHashMap.entrySet()` stream is stable for ties — matches F2-2/F2-3.
-> The second pass `putIfAbsent` inserts permanents in original order and is a no-op for
-> temporals already present.
+> Pass 1 inserts permanents in original order; pass 2 appends the sorted temporal bucket
+> (key→value pairing preserved throughout — F2-4).
 
 **Strategy B (fallback) — redirect the iteration source.** If Strategy A produces a runtime mixin
 error in the dev client (e.g. variable ordinal mismatch), target the documented loop shape
@@ -639,13 +640,14 @@ S01 Project Scaffolding & Build
  │     └─> S04 Time Capture in Modifiers.getDisplayGroup
  │           ├─> S05 (above)
  │           └─> S10 HUD Order Capture & Reorder Mixin
- │                 ├─> S11 Ordering Contract (temporal asc + stable)
+ │                 ├─> S11 Ordering Contract (anti-anchor, DEC-020)
  │                 │     └─> S12 HUD Ordering Config
  │                 └─> S13 Coexistence with QOLHunters
  ├─> S07 Sound Registry & Asset Packaging
  │     └─> S08 (above)
+ ├─> S15 Debug Logging & Diagnostics
+ │     └─> S16 Client Commands (debug / sound / status)
  └─> S14 Resilience & Failure Modes
-       └─> S15 Debug Logging & Diagnostics
 ```
 
 Critical path: **S01 → S03 → S04 → S05 → S06 → S08 → S09** (F1) and
@@ -792,7 +794,8 @@ Critical path: **S01 → S03 → S04 → S05 → S06 → S08 → S09** (F1) and
 - **Priority:** Must — **Feature:** ORDER — **Depends on:** S10
 - **Scenarios**
   1. Given temporal modifiers with times {300, 60, 900} and permanents [A, B, C] in original order;
-     When the HUD renders; Then displayed order is [T60, T300, T900, A, B, C].
+     When the HUD renders; Then displayed order is [A, B, C, T60, T300, T900] (permanents first,
+     temporal bucket after — DEC-020 anti-anchor placement).
   2. Given two temporals with equal time; When the HUD renders;
      Then they appear in their pre-sort relative order (stable).
   3. Given a modifier with no tracked time (unknown this frame);
@@ -846,6 +849,23 @@ Critical path: **S01 → S03 → S04 → S05 → S06 → S08 → S09** (F1) and
      Then no debug lines appear (only warn/error paths remain).
 - **DoD:** all logs go through the mod's `LOGGER` with format `[VMA] …`.
 
+### 7.17 S16 — Client Commands
+
+- **Priority:** Should — **Feature:** CONFIG/ROBUST — **Depends on:** S15
+- **Scenarios**
+  1. Given the game running (single-player or multiplayer); When the player runs `/vma debug on`;
+     Then `debugLogging` flips to `true` in the toml (persists after restart) and a feedback
+     message confirms.
+  2. Given the player runs `/vma sound off`; Then `alertSoundEnabled` flips to `false`
+     (persists); the next expiry marks fired but plays no sound (debug line when `debugLogging`).
+  3. Given the player runs `/vma status`; Then chat shows: debug/sound/HUD-ordering state,
+     the last observed HUD order (per-modifier `[t+Ns]`/`[permanent]` markers), vault
+     presence + frame generation, and each watched id's remaining ticks + sound override.
+  4. Given an invalid subcommand; Then the dispatcher reports usage (no crash).
+- **DoD:** commands registered on the Forge bus via `RegisterClientCommandsEvent`
+  (`ClientCommandSourceStack`, verified in Forge 1.18.2-40.3.11); toggles persist across
+  restarts; `/vma status` verified in-client.
+
 ---
 
 ## 8. Non-Functional Requirements
@@ -877,7 +897,9 @@ Perform after S09 and S12 respectively; results + screenshots/notes go to `DECIS
 5. **F1 grace:** enter a vault while a long companion modifier is already active; expect no cue
    during the grace window even if it lapses (test by setting `gracePeriodTicks=200`).
 6. **F2 order:** with ≥2 temporals at different times + ≥2 permanents, screenshot the HUD; verify
-   temporal-ascending first, permanents after, values/amounts intact.
+   permanents first, temporal bucket last at the anti-anchor (outer) edge of the block (DEC-020),
+   values/amounts intact. With BOTTOM vertical the temporals sit on the block's top row; with TOP
+   vertical on its bottom row.
 7. **F2 + QOLHunters:** repeat 6 with QOLHunters installed and its Temporal Modifier Timer on;
    countdowns must remain positioned per-icon.
 8. **F2 off:** set `enabled=false`; verify vanilla order returns.
@@ -885,6 +907,13 @@ Perform after S09 and S12 respectively; results + screenshots/notes go to `DECIS
    (invalid list entries filtered).
 10. **Build hygiene:** `./gradlew build` clean; jar contains `assets/`, `refmap`,
     `vault_modifier_alerts.mixins.json`, `mods.toml`.
+11. **Commands (debug):** `/vma debug on`; enter a vault with an active temporal; then
+    `[VMA] HUD reorder` and `[VMA] Frame captured` lines appear; `/vma debug off` removes them.
+12. **Commands (sound):** `/vma sound off`; expire a watched temporal; no cue plays (debug line
+    "sound suppressed"); `/vma sound on` restores the cue; restart the game and confirm the toggle
+    persisted in the toml.
+13. **Commands (status):** in-vault with mixed modifiers, run `/vma status`; verify the HUD-order
+    line matches the screenshot of test 6 (temporal bucket last).
 
 ---
 
