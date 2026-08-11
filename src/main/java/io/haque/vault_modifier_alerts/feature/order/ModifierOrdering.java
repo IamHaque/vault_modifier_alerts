@@ -33,7 +33,7 @@ public final class ModifierOrdering {
 		});
 		group.entrySet().stream()
 				.filter(e -> isTemporal(e.getKey()))
-				.sorted(VmaClientConfigs.HUD_ORDERING_ASCENDING.get() ? byTime : byTime.reversed())
+				.sorted(VmaClientConfigs.HUD_ORDERING_DESCENDING.get() ? byTime.reversed() : byTime)
 				.forEach(e -> result.put(e.getKey(), e.getValue()));
 		if (VmaClientConfigs.isDebugLogging()) {
 			VaultModifierAlerts.LOGGER.debug(

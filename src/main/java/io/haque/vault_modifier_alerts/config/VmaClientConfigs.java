@@ -27,7 +27,7 @@ public final class VmaClientConfigs {
 	public static final ForgeConfigSpec.BooleanValue DEBUG_LOGGING;
 
 	public static final ForgeConfigSpec.BooleanValue HUD_ORDERING_ENABLED;
-	public static final ForgeConfigSpec.BooleanValue HUD_ORDERING_ASCENDING;
+	public static final ForgeConfigSpec.BooleanValue HUD_ORDERING_DESCENDING;
 
 	static {
 		ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -49,7 +49,7 @@ public final class VmaClientConfigs {
 
 		builder.push("HUD Ordering");
 		HUD_ORDERING_ENABLED = builder.define("enabled", true);
-		HUD_ORDERING_ASCENDING = builder.define("sortTemporalAscending", true);
+		HUD_ORDERING_DESCENDING = builder.define("sortTemporalDescending", true);
 		builder.pop();
 
 		SPEC = builder.build();

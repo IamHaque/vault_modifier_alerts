@@ -517,7 +517,7 @@ signature).
 | ID   | Requirement                                                                                                                                                                                                                |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | F2-1 | Modifier icons rendered by `ModifiersRenderer.renderVaultModifiers` appear in the order defined by the `group` map's iteration. Ordered result: **permanent first, temporal last** — see DEC-020 (anti-anchor edge placement). |
-| F2-2 | Temporal modifiers (time-left measured as in §5.4) are sorted by remaining ticks within the temporal bucket — **ascending (soonest-expiring first) when `sortTemporalAscending=true`**. Tie-break: original (VH) insertion order — the sort must be **stable**. |
+| F2-2 | Temporal modifiers (time-left measured as in §5.4) are sorted by remaining ticks within the temporal bucket — **descending (longest-lasting first, soonest-expiring last) when `sortTemporalDescending=true`** (default). Tie-break: original (VH) insertion order — the sort must be **stable**. |
 | F2-3 | Permanent modifiers (no time-left) lead the list, preserving their original relative order. |
 | F2-4 | Every map entry keeps its **key→value** pairing (value = the `Integer` amount used by the renderer text overlay).                                                                                                          |
 | F2-5 | Ordering applies **only when** `hudOrdering.enabled = true`; otherwise the map passes through unchanged.                                                                                                                   |
@@ -531,7 +531,7 @@ Group **`[HUD Ordering]`**:
 | Key                     | Type    | Default | Range | Notes                                                                                                                                         |
 | ----------------------- | ------- | ------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `enabled`               | boolean | `true`  | –     | Master switch for F2.                                                                                                                         |
-| `sortTemporalAscending` | boolean | `true`  | –     | `true` = soonest-expiring first; `false` = longest-lasting first (both satisfy F1-2's family of sorts; default per product decision DEC-002). |
+| `sortTemporalDescending` | boolean | `true`  | –     | Direction inside the temporal bucket: `true` = longest-lasting first, soonest-expiring last (default per product decision DEC-021); `false` = soonest-expiring first (original DEC-002 direction). |
 
 _(F2 has no per-modifier config in v1.)_
 
@@ -569,9 +569,9 @@ public static Map<VaultModifier<?>, Integer> reorder(Map<VaultModifier<?>, Integ
     // 2. temporal bucket last (anti-anchor edge, DEC-020)
     group.entrySet().stream()
         .filter(e -> isTemporal(e.getKey()))
-        .sorted(VmaClientConfigs.HUD_ORDERING_ASCENDING.get()
-                ? Comparator.comparingInt(e -> timeOf(e.getKey()))
-                : Comparator.comparingInt(e -> timeOf(e.getKey())).reversed())
+        .sorted(VmaClientConfigs.HUD_ORDERING_DESCENDING.get()
+                ? Comparator.comparingInt(e -> timeOf(e.getKey())).reversed()
+                : Comparator.comparingInt(e -> timeOf(e.getKey())))
         .forEach(e -> result.put(e.getKey(), e.getValue()));
     return result;
 }
@@ -794,8 +794,8 @@ Critical path: **S01 → S03 → S04 → S05 → S06 → S08 → S09** (F1) and
 - **Priority:** Must — **Feature:** ORDER — **Depends on:** S10
 - **Scenarios**
   1. Given temporal modifiers with times {300, 60, 900} and permanents [A, B, C] in original order;
-     When the HUD renders; Then displayed order is [A, B, C, T60, T300, T900] (permanents first,
-     temporal bucket after — DEC-020 anti-anchor placement).
+     When the HUD renders; Then displayed order is [A, B, C, T900, T300, T60] (permanents first,
+     temporal bucket last, longest-lasting first — DEC-020/021 anti-anchor placement).
   2. Given two temporals with equal time; When the HUD renders;
      Then they appear in their pre-sort relative order (stable).
   3. Given a modifier with no tracked time (unknown this frame);
@@ -807,9 +807,9 @@ Critical path: **S01 → S03 → S04 → S05 → S06 → S08 → S09** (F1) and
 
 - **Priority:** Should — **Feature:** CONFIG/ORDER — **Depends on:** S11, S02
 - **Scenarios**
-  1. Given `sortTemporalAscending=false`; When the HUD renders temporals {300,60,900};
-     Then order is [T900, T300, T60].
-  2. Given `enabled=false`; Then the vanilla order is restored.
+  1. Given `sortTemporalDescending=false`; When the HUD renders temporals {300,60,900};
+   Then order is [T60, T300, T900] (soonest-expiring first).
+2. Given `enabled=false`; Then the vanilla order is restored.
 - **DoD:** both config keys wired into `ModifierOrdering`; scenario 1 verified in-client.
 
 ### 7.14 S13 — Coexistence with QOLHunters

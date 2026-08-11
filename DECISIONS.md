@@ -87,6 +87,7 @@ Why this option over the alternatives.
 | DEC-018 | Bundled Champ's Domain sound + per-modifier overrides       | RESOLVED | 2026-08-12 |
 | DEC-019 | Client commands for debug + sound toggles                   | RESOLVED | 2026-08-12 |
 | DEC-020 | F2 order = anti-anchor edge (permanents first, temporals last) | RESOLVED | 2026-08-12 |
+| DEC-021 | Temporal bucket direction: longest-lasting first (descending) | RESOLVED | 2026-08-12 |
 
 ---
 
@@ -103,9 +104,10 @@ F2 requires temporal modifiers to be displayed first on the HUD. There are two n
 urgent-first (soonest-expiring at the front) or expiring-last (countdown at the back).
 
 **Decision**
-Sort temporal modifiers ascending by time left (soonest-expiring first); permanents follow,
-in stable order. Ties keep insertion (map) order. Config flag `sortTemporalAscending=true`
-(default) toggles between ascending and descending.
+Sort temporal modifiers descending by time left (longest-lasting first — DEC-021 supersedes the
+original ascending default per the owner's in-game feedback); permanents follow,
+in stable order. Ties keep insertion (map) order. Config flag `sortTemporalDescending=true`
+(default) toggles between descending and ascending (see DEC-021).
 
 **Rationale**
 The alert use case is about _urgency_; the most-about-to-run-out modifier is the one the
@@ -986,7 +988,7 @@ reorder.
 Per the owner's explicit placement request ("temporal modifiers … shown at BOTTOM when TOP
 alignment is selected and TOP priority when BOTTOM is selected"), temporals move to the
 **anti-anchor edge**: map order = **permanents first (vanilla relative order), temporal bucket
-last** (sorted by time within the bucket per `sortTemporalAscending`). Because the renderer
+last** (sorted by time within the bucket per `sortTemporalDescending`, DEC-021). Because the renderer
 fills from the anchor, "last in map order" lands on the block's outer row under BOTH vertical
 alignments — the owner's rule holds without touching the vanilla renderer or horizontal
 alignment. `ModifierOrdering.reorder` is updated accordingly (pass 1 permanents, pass 2 sorted
@@ -996,8 +998,36 @@ temporals; key→value pairing preserved; `size()<2`/disabled guards unchanged).
 - Spec: §6.1 F2-1/F2-2/F2-3 (order direction), §6.3 snippet, §7.12 S11 scenario, §14 test 6;
   README F2 row; DEC-001's *order direction* is superseded for the HUD output (the time-sort
   comparator semantics remain configurable)
-- Config: unchanged keys (`sortTemporalAscending` still applies inside the temporal bucket)
+- Config: `sortTemporalAscending` replaced by `sortTemporalDescending` (default `true`, see
+  DEC-021); `sortTemporalDescending` applies inside the temporal bucket
 - Diagnostics: `/vma status` (DEC-019) exposes the exact applied order for verification
+
+---
+
+### DEC-021 — Temporal bucket direction: longest-lasting first (descending)
+
+- **Date:** 2026-08-12
+- **Status:** RESOLVED
+- **Category:** Design (overrides DEC-001's sort direction default)
+- **Relates to:** DEC-001, DEC-020
+
+**Context**
+After shipping DEC-020 (temporals at the anti-anchor edge, sorted ascending by default), the
+owner tested in-game and confirmed the placement works but asked: "Within the temporal group, it
+should be reversed" — i.e. longest-lasting temporal first, soonest-expiring last.
+
+**Decision**
+1. Reverse the default bucket direction: descending (highest remaining ticks first).
+2. Config key renamed for clarity: `sortTemporalAscending` → **`sortTemporalDescending`**
+   (default `true` = longest-lasting first; `false` = soonest first). The old key is
+   ignored if left in an existing toml (harmless); the test round deletes the toml anyway.
+3. `ModifierOrdering` sorts via `HUD_ORDERING_DESCENDING.get() ? byTime.reversed() : byTime`.
+
+**Impact**
+- Spec: §6.1 F2-2, §6.2 table row, §6.3 snippet, §7.12 S11 scenario, §7.13 S12 scenario;
+  DEC-001 decision text amended with a supersede note
+- Stories: S11, S12
+- Config: new key `sortTemporalDescending`; jar version stays 0.1.1
 
 ---
 
