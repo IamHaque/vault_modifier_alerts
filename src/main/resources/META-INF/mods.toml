@@ -5,9 +5,12 @@ license="MIT"
 modId="vault_modifier_alerts"
 version="${mod_version}"
 displayName="Vault Modifier Alerts"
-authors="(user)"
-description='''Audio alert when watched temporal vault modifiers expire,
-and HUD sorting of temporal modifiers first.'''
+authors="IamHaque"
+description='''Client-side Quality-of-Life mod for Vault Hunters 3rd Edition (Forge 1.18.2):
+plays an audio cue when a watched temporal vault modifier (e.g. Champion's Domain) expires,
+and sorts temporal modifiers to the outer edge of the vault HUD modifier block.
+Configure via config/vault_modifier_alerts-client.toml or the in-game /vma commands
+(/vma debug on|off, /vma sound on|off, /vma status).'''
 clientSideOnly=true
 
 [[dependencies.vault_modifier_alerts]]
