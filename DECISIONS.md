@@ -656,3 +656,34 @@ the file path); sounds.json key stays `temporal_expired`.
 
 - Spec sections: §5.3 (example corrected via decision)
 - Stories: S07
+
+---
+
+### DEC-014 — S10: Strategy A applied; class/package alignment corrections
+
+- **Date:** 2026-08-11
+- **Status:** RESOLVED
+- **Category:** Verification record
+
+**Context**
+S10 DoD requires the chosen reorder strategy (§6.3 A/B/C) recorded, and the spec §6.3 mixin
+snippet leaves the `ModifiersRenderer` import implicit.
+
+**Findings**
+`@ModifyVariable` (Strategy A) compiles and the `renderVaultModifiers(...)` descriptor matches
+DEC-005-R1 #5 exactly. `ModifiersRenderer` actually lives in
+`iskallia.vault.core.vault.overlay` (not `iskallia.vault.util`); `VaultModifier` in
+`iskallia.vault.core.vault.modifier.spi` (both confirmed against the 7967092 jar).
+Computed refmap is empty — expected, all mixins are `remap = false` (runtime class names).
+
+**Decision**
+Strategy A in `mixin/render/MixinModifiersRenderer` with the corrected packages. Mixin callback
+wraps `ModifierOrdering.reorder` in a narrow `try/catch (RuntimeException)`, logging once and
+falling back to the vanilla map (NFR-7). Strategy B (`@Redirect` on `Map.entrySet()`) and
+Strategy C (`@WrapOperation` on the iterated collection) remain documented fallbacks if the
+runtime dev-client shows ordinal mismatch.
+
+**Impact**
+
+- Spec sections: §6.3, NFR-7
+- Stories: S10, S11, S12
