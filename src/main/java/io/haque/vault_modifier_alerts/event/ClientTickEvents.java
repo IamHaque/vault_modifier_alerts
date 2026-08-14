@@ -14,6 +14,7 @@ import iskallia.vault.core.vault.Vault;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -24,6 +25,26 @@ import java.util.Optional;
 public final class ClientTickEvents {
 
 	private ClientTickEvents() {
+	}
+
+	/**
+	 * Vanilla only routes KeyMapping clicks while no screen is open, so the panel
+	 * toggle key would never fire inside the station GUI. ScreenEvent fires for
+	 * every key press a screen receives, so the toggle is matched here instead.
+	 */
+	@SubscribeEvent
+	public static void onScreenKeyPressed(ScreenEvent.KeyboardKeyPressedEvent.Pre event) {
+		if (!(event.getScreen() instanceof VaultArtisanStationScreen)) {
+			return;
+		}
+		if (!KeyBindings.TOGGLE_REROLL_PANEL.matches(event.getKeyCode(), event.getScanCode())) {
+			return;
+		}
+		RerollPanel panel = RerollPanel.getInstance();
+		panel.toggleVisible();
+		if (VmaClientConfigs.isDebugLogging()) {
+			VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll panel {}", panel.isVisible() ? "shown" : "hidden");
+		}
 	}
 
 	@SubscribeEvent
