@@ -27,6 +27,10 @@ public final class VaultModifierAlerts {
 				ResourceLocation.tryParse(MOD_ID + ":" + VmaReference.SOUND_EVENT_ID)));
 		sounds.register(VmaReference.DOWNED_SOUND_EVENT_ID, () -> new SoundEvent(
 				ResourceLocation.tryParse(VmaReference.DOWNED_SOUND_EVENT_NAMESPACED)));
+		sounds.register(VmaReference.REROLL_SUCCESS_SOUND_EVENT_ID, () -> new SoundEvent(
+				ResourceLocation.tryParse(VmaReference.REROLL_SUCCESS_SOUND_EVENT_NAMESPACED)));
+		sounds.register(VmaReference.REROLL_STOP_SOUND_EVENT_ID, () -> new SoundEvent(
+				ResourceLocation.tryParse(VmaReference.REROLL_STOP_SOUND_EVENT_NAMESPACED)));
 		sounds.register(modBus);
 
 		ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, VmaClientConfigs.SPEC,
