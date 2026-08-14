@@ -1,12 +1,13 @@
 # Vault Modifier Alerts
 
 A small, **client-side only** Forge mod for **Minecraft 1.18.2 / Vault Hunters 3rd Edition**
-that adds two Quality-of-Life features around world modifiers inside The Vault:
+that adds Quality-of-Life features around world modifiers inside The Vault:
 
 | ID  | Feature                     | Summary                                                                                                                                                      |
 | --- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | F1  | **Expiry Audio Alert**      | Plays an audio cue when a watched temporal modifier (e.g. `the_vault:champion_domain` — "Champion's Domain") runs out of time / is exhausted inside a vault. |
 | F2  | **HUD Modifier Reordering** | Reorders the vault modifier icons on the HUD: permanents first, temporal modifiers last (at the anti-anchor/outer edge of the block — DEC-020). |
+| F3  | **Auto-Reroll (Artisan Station)** | Chases a chosen modifier at the Artisan Station: a side panel picks the re-roll operation + target, auto-presses the station's own re-roll buttons until the target rolls (or materials/potential run out), then alerts and stops. |
 
 ---
 
@@ -16,6 +17,7 @@ that adds two Quality-of-Life features around world modifiers inside The Vault:
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `RULES.md`                | **Dev processes & coding standards.** DRY, Java coding guidelines, separation of concerns, code grouping, mixin conventions, git workflow, definition-of-done. Read before doing anything.                                   |
 | `MODIFIER_ALERTS_SPEC.md` | **The implementation specification.** Fully prescriptive: verified Vault Hunters internals, exact mixin shapes, algorithms, configuration keys, and BDD story breakdown (S01–S16) with dependencies. Implement exactly this. |
+| `F3_AUTO_REROLL_PLAN.md`  | **F3 requirement & implementation plan.** The owner-approved plan the F3 (Auto-Reroll) feature was implemented against. |
 | `DECISIONS.md`            | **Decision log.** Every implementation-time decision/ambiguity resolution must be recorded here (procedure + template + pre-seeded decisions DEC-001…).                                                                      |
 
 ---
@@ -67,10 +69,49 @@ warns once and stays silent.
 | `/vma debug off`    | Disables debug logging.                                                                                    |
 | `/vma sound on`     | Enables expiry alert sounds (writes `alertSoundEnabled=true`; persists across restarts).                   |
 | `/vma sound off`    | Silences expiry alerts (firing state still tracked; no audio).                                             |
+| `/vma reroll start` | Starts auto-rerolling with the panel's current operation + target selection.                               |
+| `/vma reroll stop`  | Stops the running auto-reroll.                                                                             |
 | `/vma status`       | Prints config state, the last observed HUD modifier order, vault/frame state, and each watched id's status. |
 
 Commands are client-side (Forge `RegisterClientCommandsEvent`) and work in single-player and
 multiplayer. Toggles persist in `config/vault_modifier_alerts-client.toml`.
+
+## Auto-Reroll (F3)
+
+At an Artisan Station, press **P** to toggle the Auto-Reroll side panel (drawn **outside**
+the station window — right side preferred, left fallback — so it never obstructs the GUI):
+
+- **Op** — the re-roll operation: reforge all (`reforge_all`), reforge prefix / suffix
+  (`reforge_affix_prefix`/`_suffix`), or reforge implicits (`reforge_implicits`).
+- **Tgt** — the target modifier that can actually roll under the selected operation for the
+  gear in the station (impossible targets, e.g. an attack-damage modifier on a helmet, are
+  not offered).
+- **Auto-reset** checkbox — when the selected operation is disabled for lack of crafting
+  potential, press `reset_potential` (Opportunistic Focus) once per run automatically
+  (config `autoResetPotential`, default `true`).
+
+Start / Stop with the panel button or `/vma reroll start|stop` (the command uses the panel's
+current selection). The engine presses the station's own buttons through the same code path
+as a player click; it stops and plays the configured sound (`successSoundEvent` on success,
+`stopSoundEvent` otherwise) on: target rolled, gear removed, out of materials, out of
+potential, target no longer rollable, max rolls reached, no roll detected in time, station
+closed, or manual stop.
+
+Config `[Auto Reroll]` in `config/vault_modifier_alerts-client.toml`:
+
+| Key                 | Default                          | Meaning                                             |
+| ------------------- | -------------------------------- | --------------------------------------------------- |
+| `enabled`           | `true`                           | Master switch for the feature.                      |
+| `tickInterval`      | `15` (4–200)                     | Ticks between presses.                              |
+| `rollTimeoutTicks`  | `60` (10–400)                    | Wait for the gear to change before giving up.       |
+| `maxRolls`          | `0`                              | Press cap; `0` = unlimited.                         |
+| `autoResetPotential`| `true`                           | Auto-press Opportunistic Focus when out of potential (once per run). |
+| `successSoundEvent` | `minecraft:block.note_block.pling` | Sound when the target rolls.                      |
+| `stopSoundEvent`    | `minecraft:block.note_block.pling` | Sound for any other stop.                         |
+| `volume` / `pitch`  | `1.0` / `1.0`                    | Playback settings for both events.                  |
+
+The keybind (default **P**) is rebindable under *Options → Controls → Key Binds → Vault
+Modifier Alerts*.
 
 ---
 

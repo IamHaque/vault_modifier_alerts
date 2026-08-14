@@ -88,6 +88,10 @@ Why this option over the alternatives.
 | DEC-019 | Client commands for debug + sound toggles                   | RESOLVED | 2026-08-12 |
 | DEC-020 | F2 order = anti-anchor edge (permanents first, temporals last) | RESOLVED | 2026-08-12 |
 | DEC-021 | Temporal bucket direction: longest-lasting first (descending) | RESOLVED | 2026-08-12 |
+| DEC-022 | F3 operation selector: re-roll ops only; reset_potential automatic | RESOLVED | 2026-08-15 |
+| DEC-023 | F3 panel drawn inside the station screen via mixin (no separate Screen) | RESOLVED | 2026-08-15 |
+| DEC-024 | F3 applicability guard source: VaultGearTierConfig groups per scope | RESOLVED | 2026-08-15 |
+| DEC-025 | F3 engine press semantics, stop reasons & 1.18.2 API facts | RESOLVED | 2026-08-15 |
 
 ---
 
@@ -1028,6 +1032,189 @@ should be reversed" — i.e. longest-lasting temporal first, soonest-expiring la
   DEC-001 decision text amended with a supersede note
 - Stories: S11, S12
 - Config: new key `sortTemporalDescending`; jar version stays 0.1.1
+
+---
+
+### DEC-022 — F3 operation selector: re-roll operations only; reset_potential automatic
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+- **Relates to:** F3_AUTO_REROLL_PLAN.md §3/§4
+
+**Context**
+The Artisan Station exposes many operations through
+`VaultArtisanStationContainer.getModificationActions()` (reforge_all, reforge_affix_prefix/
+suffix, reforge_implicits, reset_potential, flat modifiers, etc.). The F3 selector must list
+only operations that actually roll modifiers toward a target — and the owner approved
+auto-using `reset_potential` (Opportunistic Focus) instead of listing it.
+
+**Decision**
+The panel lists only the 4 re-roll operations (`the_vault:reforge_all`,
+`reforge_affix_prefix`, `reforge_affix_suffix`, `reforge_implicits`), identified via
+`ModifierCatalog.isRerollOperation` (OperationScope != null). `reset_potential` is **not**
+selectable: the engine presses it automatically (at most once per run) when the selected
+operation is disabled for lack of potential and `autoResetPotential` (default `true`) is on;
+if it cannot be pressed, the run stops with OUT_OF_POTENTIAL. Note reforge_all only re-rolls
+PREFIX+SUFFIX (implicits untouched — jar-verified `reForgeAllModifiers`).
+
+**Rationale**
+Every listed operation is a chaseable roll (a run on `reset_potential` could never succeed —
+it yields no modifier); reusing the container's own action list keeps the UI honest and
+version-robust.
+
+**Alternatives considered**
+
+1. List `reset_potential` as a fifth operation — rejected: it never rolls a modifier, so a
+   run could never reach SUCCESS on it.
+2. Hard-code the auto-reset without a config — rejected: the owner asked for a toggle.
+
+**Impact**
+
+- Plan: §3 (catalog), §4.2 (selector)
+- Config: `autoResetPotential`
+- Stories: F3 (engine, panel, commands)
+
+---
+
+### DEC-023 — F3 panel drawn inside the station screen via mixin (no separate Screen)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The owner required the F3 GUI to never overlap/obstruct the Artisan Station GUI. A separate
+`Screen` cannot satisfy this: opening one replaces the station screen (breaking container
+rendering) — and the station's window + buttons occupy most of the screen. The station
+screen renders via `render` (SRG `m_6305_`, inherited from `AbstractElementContainerScreen`)
+and receives clicks via `mouseClicked` (SRG `m_7933_`); the private `attemptCraft`
+(`GearModificationAction`) is the exact code path of a button press.
+
+**Decision**
+`RerollPanel` is a plain drawable rendered at TAIL of `m_6305_` by
+`mixin/artisan/MixinVaultArtisanStationScreen`, anchored **outside** the station window rect
+(right side preferred, left fallback, clamped to screen bounds). Clicks inside the panel
+rect are consumed at HEAD of `m_7933_` (cancellable) before the station sees them. The
+engine triggers presses through the duck interface `ArtisanStationScreenAccessor`
+(`vma$triggerAction` → `@Shadow attemptCraft`); a HEAD inject on `attemptCraft` feeds
+`AutoRerollEngine.onCraftTriggered` (cooldown/double-click protection). No Screen subclass
+is created; the panel follows the station lifecycle (engine stops on screen close). The P
+key (KeyBindings, `ClientRegistry.registerKeyBinding` in FMLClientSetupEvent) toggles panel
+visibility.
+
+**Rationale**
+Single-screen overlay is the only design that both keeps the station interactive and
+satisfies the no-overlap requirement; the duck interface is the established accessor
+pattern (`tracker.VaultModifierTimeAccessor`).
+
+**Alternatives considered**
+
+1. Standalone `RerollScreen` opened on top — rejected: replaces the station, breaks its
+   rendering, cannot avoid overlap.
+2. Reflection on private `attemptCraft` — rejected: fragile, bypasses the accessor pattern.
+3. Render a vanilla `Screen`/widget layer inside the station — rejected: over-engineering.
+
+**Impact**
+
+- Plan: §3 (mixins), §4.1 (panel)
+- Files: `mixin/artisan/MixinVaultArtisanStationScreen`, `ArtisanStationScreenAccessor`,
+  `feature/reroll/RerollPanel`, `event/KeyBindings`; mixins.json entry added atomically
+- Stories: F3 (panel, mixin)
+
+---
+
+### DEC-024 — F3 applicability guard source: VaultGearTierConfig groups per scope
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The owner required that impossible targets (e.g. an attack-damage modifier on a helmet) can
+never be selected or chased. The candidate pool must come from the same data the station's
+re-roll itself uses, or the guard and the roll would disagree.
+
+**Decision**
+`ModifierCatalog` derives candidates from
+`VaultGearTierConfig.getConfig(gear).getModifierGroup(ModifierAffixTagGroup)` for the
+operation's scope (PREFIX / SUFFIX / IMPLICIT / PREFIX_SUFFIX — affix groups via
+`ModifierAffixTagGroup.ofAffixType`), taking each `ModifierTierGroup` whose
+`getModifiersForLevel(gear item level)` is non-empty; display names come from the
+`VaultGearAttributeRegistry` attribute reader. `ModifierCatalog.isApplicable` re-validates
+the target at **every** engine evaluation, so a gear swap mid-run that removes the target
+stops the run with INVALID_TARGET instead of pressing a disabled action.
+
+**Rationale**
+A single source of truth identical to the roll itself; runtime re-validation covers the
+mid-run gear-change case that a static selector could not.
+
+**Alternatives considered**
+
+1. Static allow-list of modifier ids — rejected: version-sensitive, diverges from the roll
+   pool.
+2. Always allow, rely on the game to reject — rejected: violates the owner requirement.
+
+**Impact**
+
+- Plan: §3 (catalog), §4.3 (INVALID_TARGET)
+- Stories: F3 (catalog, engine, panel)
+
+---
+
+### DEC-025 — F3 engine press semantics, stop reasons & 1.18.2 API facts
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The F3 engine must press the exact same button path as a player click (canApply gate +
+bronze cache invalidation + `VaultArtisanRequestModificationMessage`) without reimplementing
+any game mechanic (owner constraint), classify why an action is disabled, and alert the user
+with a stop reason. During implementation, several 1.18.2 API facts had to be pinned down.
+
+**Decision**
+`AutoRerollEngine` presses only through the accessor (`attemptCraft`); presses are
+rate-limited by `tickInterval` (default 15 ticks); a roll is in-flight until the gear slot
+stack changes (`ItemStack.matches` on the copy taken at press time; `rollTimeoutTicks`
+default 60 → TIMEOUT); `maxRolls` (0 = unlimited) caps presses → MAX_ROLLS; a disabled
+action is classified with `VaultGearCraftingHelper.reducePotential(gear.copy(), player,
+modification)` — `false` ⇒ OUT_OF_POTENTIAL (one auto `reset_potential` per run if enabled
+and available, else stop), otherwise OUT_OF_MATERIALS. Stop reasons: SUCCESS (target
+modifier id present in the gear's modifiers for the operation scope), NO_GEAR,
+OUT_OF_MATERIALS, OUT_OF_POTENTIAL, INVALID_TARGET, MAX_ROLLS, TIMEOUT, SCREEN_CLOSED,
+STOPPED. SUCCESS plays `successSoundEvent`, every other stop plays `stopSoundEvent`
+(defaults `minecraft:block.note_block.pling`).
+
+**Verified 1.18.2 facts**
+
+- `ItemStack.matches(ItemStack, ItemStack)` is the static tag-compare; the two-arg static
+  `is(...)` form is 1.19+.
+- `getGuiLeft()`/`getGuiTop()`/`getXSize()`/`getYSize()` do **not** exist in vanilla 1.18.2
+  `AbstractContainerScreen` (confirmed against the official Mojang client mappings) — they
+  are **Forge 1.18.2 patches**; VH's own `AbstractElementContainerScreen.getGuiSpatial()`
+  bytecode calls them, proving their runtime presence. Our panel uses them directly.
+- Java 17 (project target) forbids `case null` in switch statements.
+- `m_6305_` (render) is declared on `AbstractElementContainerScreen`; `m_7933_
+  (mouseClicked)` on `VaultArtisanStationScreen`; both public — verified on the SRG jar.
+
+**Rationale**
+Zero game-mechanic reimplementation (owner constraint); classification reuses the game's own
+potential reducer on a copy (client-safe, read-only), so stop reasons match what the player
+would see.
+
+**Alternatives considered**
+
+1. Send `VaultArtisanRequestModificationMessage` directly — rejected: bypasses the canApply
+   gate and bronze cache, duplicating game logic.
+2. Click blind on disabled buttons and guess the reason — rejected: wrong classification,
+   no reliable stop reasons.
+
+**Impact**
+
+- Plan: §4.3 (engine), §3 (panel anchor)
+- Stories: F3 (engine, tick wiring, commands, sounds)
 
 ---
 
