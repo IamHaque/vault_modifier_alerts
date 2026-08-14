@@ -1,6 +1,7 @@
 package io.haque.vault_modifier_alerts.mixin.artisan;
 
 import io.haque.vault_modifier_alerts.VaultModifierAlerts;
+import io.haque.vault_modifier_alerts.feature.reroll.ArtisanStationScreenAccessor;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;

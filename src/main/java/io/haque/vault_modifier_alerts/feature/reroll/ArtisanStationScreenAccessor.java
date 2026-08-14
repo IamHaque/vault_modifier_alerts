@@ -1,4 +1,4 @@
-package io.haque.vault_modifier_alerts.mixin.artisan;
+package io.haque.vault_modifier_alerts.feature.reroll;
 
 import iskallia.vault.gear.modification.GearModificationAction;
 

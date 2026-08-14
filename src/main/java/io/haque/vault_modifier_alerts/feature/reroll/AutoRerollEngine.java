@@ -5,7 +5,6 @@ import io.haque.vault_modifier_alerts.VmaReference;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.expiry.AlertSoundPlayer;
 import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog.OperationScope;
-import io.haque.vault_modifier_alerts.mixin.artisan.ArtisanStationScreenAccessor;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.container.VaultArtisanStationContainer;
 import iskallia.vault.gear.attribute.VaultGearModifier;
