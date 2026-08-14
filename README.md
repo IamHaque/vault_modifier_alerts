@@ -86,10 +86,14 @@ the station window — right side preferred, left fallback — so it never obstr
 - **Modifier** — the target modifier that can actually roll under the selected operation for
   the gear in the station (impossible targets, e.g. an attack-damage modifier on a helmet, are
   not offered). Click the row to open a scrollable dropdown with every available modifier,
-  shown with human-readable names and their rollable value ranges.
+  shown with human-readable names and their rollable value ranges. Ability/talent level
+  modifiers are named by the ability they add (e.g. "Ice Bolt") — no "Mod Added Ability
+  Level" prefix wording. Any name or range too long for its row shows its full text on hover.
 - **Min** — an optional minimum threshold: keep rolling until the target rolls at least this
   value (type it in, or step with the `-`/`+` buttons; the rollable range is shown below the
-  field). No threshold = stop on any roll of the target.
+  field). The value is always kept, even when the panel cannot read the target's roll range
+  ("Range: ?") — the engine then compares "at least X" without clamping. No threshold = stop
+  on any roll of the target.
 - **Auto-reroll** toggle — master switch for the feature, right in the GUI (persists to the
   `enabled` config; turning it off stops any running roll and dims the controls).
 - **Auto-reset potential** checkbox — when the selected operation is disabled for lack of

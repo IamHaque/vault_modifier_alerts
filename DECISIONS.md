@@ -1348,7 +1348,72 @@ sessions do not rediscover the jar location or command shape.
 
 ---
 
-### DEC-028 - F3 reroll GUI revamp: dropdown selectors, GUI toggle, layout engine (owner request)
+### DEC-029 - Typed tier-config parsing, ability names, threshold retention, spacing (owner request)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+Owner review of the F3 panel after DEC-028: (a) every ability/talent re-roll
+candidate showed the same "Mod Added Ability Level" (resp. "Mod Added Talent Level")
+prefix wording instead of the ability/it adds; (b) "No Numeric Threshold" appeared for
+the selected attribute and typed threshold values were silently cleared instead of
+accepted; (c) rows were cramped; (d) over-long text should reveal the full text on
+hover. Reference implementation studied: `radimous/VHatCanIRoll` (same data path).
+
+**Root causes (verified against the Remastered instance's pack configs and jar)**
+1. `ModifierTier.getModifierConfiguration()` returns **typed config objects**, not
+   `JsonObject` (e.g. `IntegerAttributeGenerator.Range` with public `min/max/step`,
+   `Float/DoubleAttributeGenerator.Range` with private fields, `AbilityLevelAttribute.Config`
+   with `abilityKey`/`levelChange`), so the old `instanceof JsonObject` check was always
+   false and every range resolved to non-numeric.
+2. Candidate display names came from the reader/group-id strings ("Ability Level",
+   "Mod Added Ability Level Icebolt"); the real per-tier configs carry the ability id
+   (`"value": {"abilityKey": "Ice_Bolt_Base", "levelChange": N}`).
+3. The old self-heal cleared a committed threshold whenever it considered the target
+   non-numeric.
+
+**Decision**
+1. **Numeric extraction:** `rollRange` uses the attribute's own generator API first -
+   `generator.getMinimumValue/getMaximumValue` over the level-applicable tiers
+   (`tierGroup.getModifiersForLevel(gearLevel)`, all-tiers fallback) - plus typed
+   casing: `IntegerAttributeGenerator.Range` public fields (step), ability/talent
+   `Config` as point values ("+N levels", step 1). Float/Double percentage ranges
+   store fractions and are scaled into display units (×100) exactly like
+   `toDisplayUnits` does, so thresholds stay comparable. Raw `JsonObject` tier blocks
+   remain supported as a fallback for custom attributes without a generator.
+2. **Ability/talent names:** display = the ability/talent name only, from
+   `AbilityLevelAttribute.Config.getAbilityKey()` / `TalentLevelAttribute.Config.getTalent()`
+   -> `ModConfigs.ABILITIES.getAbilityById(...)` / `ModConfigs.TALENTS.getTalentById(...)`
+   -> `Skill.getName()`; special keys "all_abilities"/"all_talents" -> "All Abilities" /
+   "All Talents"; `AbilityType.matches` -> "All <Type> Abilities"; fallback humanizes
+   the key with a trailing "_Base" tag trimmed. `toDisplayUnits` handles
+   `AbilityLevelAttribute`/`TalentLevelAttribute` values by their `levelChange`, so the
+   engine can compare "+N levels" thresholds.
+3. **Threshold retention:** `commitMinInput` keeps any valid number - clamped to the
+   known roll range when numeric, kept as-is (compare "at least X" unclamped) when the
+   range is unknown; only unparseable text clears. `stepMin` uses ±step when known and
+   ±1 unclamped when not. The draw-time self-heal reset is removed; the range row shows
+   "Range: ?" when the range could not be read.
+4. **Spacing:** panel width 200 -> 216, row height 11 -> 14, title band 12 -> 18, side
+   padding 6 -> 8, buttons 12 -> 14, dropdown rows 11 -> 14 with 8 visible by default
+   (clamped 3..8), all label/hit zones recomputed in `RerollPanelLayout`.
+5. **Hover popover:** any text truncated to its row (Focus/Modifier values, range row,
+   status line, dropdown items) shows its full text in a small dark popover racing the
+   cursor (manually wrapped, screen-clamped), drawn after the panel frame.
+
+**Rationale**
+Reading values through VH's own generator API (as `VHatCanIRoll` does) makes the range
+and threshold logic correct for every generator type the game ships, instead of
+guessing JSON shapes; names come from the same config values the game rolls with.
+
+**Impact**
+- Files: `ModifierCatalog`, `RerollPanel`, `RerollPanelLayout`, `README.md`,
+  `F3_AUTO_REROLL_PLAN.md`.
+- Engine state machine, stop reasons, sounds, `/vma reroll` contract: unchanged.
+- DEC-028's "Impact" numbers are superseded: base panel height is now ~150 px,
+  width 216.
 
 - **Date:** 2026-08-15
 - **Status:** RESOLVED

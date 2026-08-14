@@ -8,15 +8,19 @@ package io.haque.vault_modifier_alerts.feature.reroll;
  */
 public final class RerollPanelLayout {
 
-	public static final int WIDTH = 200;
-	public static final int PAD_X = 6;
+	public static final int WIDTH = 216;
+	public static final int PAD_X = 8;
 
-	public static final int TITLE_H = 12;
-	public static final int ROW_H = 11;
-	public static final int BUTTON_H = 12;
-	public static final int DROPDOWN_HEADER_H = 11;
-	public static final int DROPDOWN_ITEM_H = 11;
-	public static final int BOTTOM_PAD = 4;
+	public static final int TITLE_H = 18;
+	public static final int ROW_H = 14;
+	public static final int BUTTON_H = 14;
+	public static final int DROPDOWN_HEADER_H = 14;
+	public static final int DROPDOWN_ITEM_H = 14;
+	public static final int BOTTOM_PAD = 6;
+
+	public static final int DEFAULT_DROPDOWN_ROWS = 8;
+	public static final int MIN_DROPDOWN_ROWS = 3;
+	public static final int MAX_DROPDOWN_ROWS = 8;
 
 	public enum HitType {
 		NONE, FOCUS_ROW, MODIFIER_ROW, MIN_DEC, MIN_FIELD, MIN_INC, REROLL_TOGGLE, RESET_TOGGLE, START_BUTTON,
@@ -76,11 +80,11 @@ public final class RerollPanelLayout {
 	}
 
 	public int minFieldLeft() {
-		return x + 42;
+		return x + 44;
 	}
 
 	public int minFieldRight() {
-		return x + 176;
+		return x + 184;
 	}
 
 	public record Rect(int x, int y, int width, int height) {
@@ -105,10 +109,10 @@ public final class RerollPanelLayout {
 		}
 		if (mouseY >= dropdownY) {
 			if (mouseY < dropdownY + DROPDOWN_HEADER_H) {
-				if (mouseX < x + 12) {
+				if (mouseX < x + 14) {
 					return new Hit(HitType.DROPDOWN_UP, -1);
 				}
-				if (mouseX >= x + WIDTH - 12) {
+				if (mouseX >= x + WIDTH - 14) {
 					return new Hit(HitType.DROPDOWN_DOWN, -1);
 				}
 				return new Hit(HitType.NONE, -1);
@@ -126,10 +130,10 @@ public final class RerollPanelLayout {
 			return new Hit(HitType.MODIFIER_ROW, -1);
 		}
 		if (inside(mouseY, minY, ROW_H)) {
-			if (mouseX < x + 14) {
+			if (mouseX < x + 16) {
 				return new Hit(HitType.MIN_DEC, -1);
 			}
-			if (mouseX >= x + WIDTH - 14) {
+			if (mouseX >= x + WIDTH - 16) {
 				return new Hit(HitType.MIN_INC, -1);
 			}
 			if (mouseX >= minFieldLeft() && mouseX < minFieldRight()) {

@@ -36,8 +36,6 @@ public final class RerollPanel {
 		NONE, OPERATION, MODIFIER
 	}
 
-	private static final int DEFAULT_DROPDOWN_ROWS = 9;
-
 	private static final int BG_COLOR = 0xEE111111;
 	private static final int BORDER_COLOR = 0xFF6B6B6B;
 	private static final int GOLD_COLOR = 0xFFE3C38C;
@@ -63,11 +61,14 @@ public final class RerollPanel {
 	private boolean minInputFocused;
 	private DropdownMode dropdownMode = DropdownMode.NONE;
 	private int dropdownScroll;
-	private int dropdownMaxRows = DEFAULT_DROPDOWN_ROWS;
+	private int dropdownMaxRows = RerollPanelLayout.DEFAULT_DROPDOWN_ROWS;
 	private int lastX;
 	private int lastY;
 	private int lastW;
 	private int lastH;
+	private String pendingTooltip;
+	private int tooltipX;
+	private int tooltipY;
 
 	private RerollPanel() {
 	}
@@ -179,7 +180,9 @@ public final class RerollPanel {
 	}
 
 	/**
-	 * Commits the field text: clamps to the target's roll range.
+	 * Commits the field text. A valid number is always kept: it is clamped to
+	 * the target's roll range when that range is known, and used as-is when the
+	 * range could not be read (the engine compares "at least X" either way).
 	 */
 	public void commitMinInput() {
 		if (minInputText.isEmpty()) {
@@ -188,12 +191,6 @@ public final class RerollPanel {
 			return;
 		}
 		RollRange range = currentTargetRange();
-		if (!range.numeric()) {
-			minInputText = "";
-			thresholdEnabled = false;
-			thresholdValue = 0;
-			return;
-		}
 		String text = minInputText.endsWith(".") ? minInputText.substring(0, minInputText.length() - 1) : minInputText;
 		Double parsed = safeParseOrNull(text);
 		if (parsed == null) {
@@ -203,7 +200,7 @@ public final class RerollPanel {
 			return;
 		}
 		thresholdEnabled = true;
-		thresholdValue = Mth.clamp(parsed, range.min(), range.max());
+		thresholdValue = range.numeric() ? Mth.clamp(parsed, range.min(), range.max()) : parsed;
 		minInputText = formatDisplay(thresholdValue, false);
 	}
 
@@ -325,38 +322,36 @@ public final class RerollPanel {
 		GearModificationAction operation = operations.isEmpty() ? null : operations.get(operationIndex);
 		List<Candidate> candidates = operation == null ? List.of() : candidates(gear, operation);
 		clampDropdownScroll(operations.size(), candidates.size());
-		if (thresholdEnabled && !currentTargetRange().numeric()) {
-			resetMinInput();
-		}
 		RerollPanelLayout layout = computeLayout(x, y);
+		pendingTooltip = null;
 
 		drawPanelFrame(poseStack, layout);
-		drawCentered(poseStack, "Auto-Reroll", x + width / 2, y + 2, GOLD_COLOR);
+		drawCentered(poseStack, "Auto-Reroll", x + width / 2, y + 4, GOLD_COLOR);
 
 		if (operation == null) {
-			drawString(poseStack, "No re-roll actions", x + RerollPanelLayout.PAD_X, layout.focusY + 1, WARN_COLOR);
-			drawStatus(poseStack, layout, candidates.isEmpty());
+			drawString(poseStack, "No re-roll actions", x + RerollPanelLayout.PAD_X, layout.focusY + 3, WARN_COLOR);
+			drawStatus(poseStack, layout, candidates.isEmpty(), mouseX, mouseY);
+			drawTooltip(poseStack);
 			return;
 		}
 
 		boolean enabled = VmaClientConfigs.isAutoRerollEnabled();
 		drawRow(poseStack, layout, "Focus", displayOperationName(operation), layout.focusY, mouseX, mouseY,
 				dropdownMode == DropdownMode.OPERATION);
-		drawRow(poseStack, layout, "Modifier",
-				candidates.isEmpty() ? "none rollable" : truncate(candidates.get(targetIndex).displayName(), 18),
-				layout.modifierY, mouseX, mouseY, dropdownMode == DropdownMode.MODIFIER);
+		drawModifierRow(poseStack, layout, candidates, mouseX, mouseY);
 		drawMinRow(poseStack, layout, x, width, mouseX, mouseY);
-		drawRangeRow(poseStack, layout, x, width);
+		drawRangeRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawPotentialRow(poseStack, layout, x, width, operation);
 		drawToggleRow(poseStack, layout, x, "Auto-reroll", enabled, layout.rerollToggleY, mouseX, mouseY);
 		drawToggleRow(poseStack, layout, x, "Auto-reset potential",
 				VmaClientConfigs.isAutoResetPotentialEnabled(), layout.resetToggleY, mouseX, mouseY);
 		drawButton(poseStack, layout, engine, canStart(candidates), mouseX, mouseY);
-		drawStatus(poseStack, layout, candidates.isEmpty());
+		drawStatus(poseStack, layout, candidates.isEmpty(), mouseX, mouseY);
 
 		if (dropdownMode != DropdownMode.NONE) {
 			drawDropdown(poseStack, layout, operations, candidates, mouseX, mouseY);
 		}
+		drawTooltip(poseStack);
 	}
 
 	/** @return true when the point lies inside the panel rect (no other meaning). */
@@ -522,7 +517,8 @@ public final class RerollPanel {
 	private void updateDropdownCapacity(VaultArtisanStationScreen screen, int x, int y) {
 		int available = screen.height - (y + new RerollPanelLayout(x, y, false, 0, 0, 0).baseHeight
 				+ RerollPanelLayout.DROPDOWN_HEADER_H);
-		dropdownMaxRows = Mth.clamp(available / RerollPanelLayout.DROPDOWN_ITEM_H, 3, DEFAULT_DROPDOWN_ROWS);
+		dropdownMaxRows = Mth.clamp(available / RerollPanelLayout.DROPDOWN_ITEM_H,
+				RerollPanelLayout.MIN_DROPDOWN_ROWS, RerollPanelLayout.MAX_DROPDOWN_ROWS);
 	}
 
 	private RerollPanelLayout computeLayout(int x, int y) {
@@ -562,25 +558,61 @@ public final class RerollPanel {
 					y + RerollPanelLayout.ROW_H, HOVER_COLOR);
 		}
 		int color = VmaClientConfigs.isAutoRerollEnabled() ? TEXT_COLOR : DISABLED_COLOR;
-		drawString(poseStack, label, layout.x + RerollPanelLayout.PAD_X, y + 1, MUTED_COLOR);
-		drawString(poseStack, value, layout.x + 62, y + 1, color);
-		drawTriangle(poseStack, layout.x + RerollPanelLayout.WIDTH - 8, y + 5, false, color);
+		drawString(poseStack, label, layout.x + RerollPanelLayout.PAD_X, y + 3, MUTED_COLOR);
+		drawString(poseStack, value, layout.x + 62, y + 3, color);
+		drawTriangle(poseStack, layout.x + RerollPanelLayout.WIDTH - 8, y + 6, false, color);
+		if (hovered && layout.x + 62 + font().width(value) > layout.x + RerollPanelLayout.WIDTH
+				- RerollPanelLayout.PAD_X) {
+			hoverTooltip(value, mouseX, mouseY);
+		}
+	}
+
+	/** Modifier row: shows only the modifier name (the "Mod Added Ability Level" prefix is gone). */
+	private void drawModifierRow(PoseStack poseStack, RerollPanelLayout layout, List<Candidate> candidates, int mouseX,
+			int mouseY) {
+		boolean hovered = mouseY >= layout.modifierY && mouseY < layout.modifierY + RerollPanelLayout.ROW_H;
+		if (dropdownMode == DropdownMode.MODIFIER) {
+			GuiComponent.fill(poseStack, layout.x, layout.modifierY, layout.x + RerollPanelLayout.WIDTH,
+					layout.modifierY + RerollPanelLayout.ROW_H, HIGHLIGHT_COLOR);
+		} else if (hovered) {
+			GuiComponent.fill(poseStack, layout.x, layout.modifierY, layout.x + RerollPanelLayout.WIDTH,
+					layout.modifierY + RerollPanelLayout.ROW_H, HOVER_COLOR);
+		}
+		int color = VmaClientConfigs.isAutoRerollEnabled() ? TEXT_COLOR : DISABLED_COLOR;
+		drawString(poseStack, "Modifier", layout.x + RerollPanelLayout.PAD_X, layout.modifierY + 3, MUTED_COLOR);
+		String name;
+		if (candidates.isEmpty()) {
+			name = "none rollable";
+		} else {
+			name = candidates.get(targetIndex).displayName();
+			int maxChars = (RerollPanelLayout.WIDTH - 62 - RerollPanelLayout.PAD_X * 2) / 7;
+			if (name.length() > maxChars) {
+				String full = name;
+				name = truncate(name, maxChars);
+				if (hovered) {
+					hoverTooltip(full, mouseX, mouseY);
+				}
+			}
+		}
+		drawString(poseStack, name, layout.x + 62, layout.modifierY + 3, color);
+		drawTriangle(poseStack, layout.x + RerollPanelLayout.WIDTH - 8, layout.modifierY + 6, false, color);
 	}
 
 	private void drawMinRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX, int mouseY) {
 		RollRange range = currentTargetRange();
 		boolean numeric = range.numeric();
+		boolean enabled = VmaClientConfigs.isAutoRerollEnabled();
 		boolean hoveredDec = mouseY >= layout.minY && mouseY < layout.minY + RerollPanelLayout.ROW_H
-				&& mouseX < x + 14;
+				&& mouseX < x + 16;
 		boolean hoveredInc = mouseY >= layout.minY && mouseY < layout.minY + RerollPanelLayout.ROW_H
-				&& mouseX >= x + width - 14;
+				&& mouseX >= x + width - 16;
 		boolean hoveredField = mouseY >= layout.minY && mouseY < layout.minY + RerollPanelLayout.ROW_H
 				&& mouseX >= layout.minFieldLeft() && mouseX < layout.minFieldRight();
-		int arrowColor = VmaClientConfigs.isAutoRerollEnabled() && numeric ? MUTED_COLOR : DISABLED_COLOR;
-		drawString(poseStack, "-", x + 4, layout.minY + 1, hoveredDec && numeric ? TEXT_COLOR : arrowColor);
-		drawString(poseStack, "Min", x + 18, layout.minY + 1, MUTED_COLOR);
-		drawString(poseStack, "+", x + 188, layout.minY + 1, hoveredInc && numeric ? TEXT_COLOR : arrowColor);
-		if (numeric && (minInputFocused || thresholdEnabled)) {
+		int arrowColor = enabled ? MUTED_COLOR : DISABLED_COLOR;
+		drawString(poseStack, "-", x + 5, layout.minY + 3, hoveredDec ? TEXT_COLOR : arrowColor);
+		drawString(poseStack, "Min", x + 22, layout.minY + 3, MUTED_COLOR);
+		drawString(poseStack, "+", x + 196, layout.minY + 3, hoveredInc ? TEXT_COLOR : arrowColor);
+		if (minInputFocused || thresholdEnabled) {
 			GuiComponent.fill(poseStack, layout.minFieldLeft(), layout.minY, layout.minFieldRight(),
 					layout.minY + RerollPanelLayout.ROW_H, minInputFocused ? FIELD_FOCUS_COLOR : FIELD_BG_COLOR);
 		}
@@ -592,15 +624,22 @@ public final class RerollPanel {
 		} else {
 			shown = "any";
 		}
-		drawString(poseStack, shown, layout.minFieldLeft() + 2, layout.minY + 1,
+		drawString(poseStack, shown, layout.minFieldLeft() + 2, layout.minY + 3,
 				hoveredField && !minInputFocused ? GOLD_COLOR : TEXT_COLOR);
 	}
 
-	private void drawRangeRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width) {
+	private void drawRangeRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX, int mouseY) {
 		RollRange range = currentTargetRange();
-		String text = range.numeric() ? "Range: " + range.displayText() : "No numeric threshold";
-		drawString(poseStack, truncate(text, (width - RerollPanelLayout.PAD_X * 2) / 7), x + RerollPanelLayout.PAD_X,
-				layout.rangeY + 1, MUTED_COLOR);
+		String text = range.numeric() ? "Range: " + range.displayText() : "Range: ?";
+		String full = text;
+		int maxChars = (RerollPanelLayout.WIDTH - RerollPanelLayout.PAD_X * 2) / 7;
+		if (text.length() > maxChars) {
+			text = truncate(text, maxChars);
+			if (mouseY >= layout.rangeY && mouseY < layout.rangeY + RerollPanelLayout.ROW_H) {
+				hoverTooltip(full, mouseX, mouseY);
+			}
+		}
+		drawString(poseStack, text, x + RerollPanelLayout.PAD_X, layout.rangeY + 3, MUTED_COLOR);
 	}
 
 	private void drawPotentialRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width,
@@ -612,9 +651,9 @@ public final class RerollPanel {
 		String left = "Potential " + potential + "/" + max;
 		String right = cost > 0 && potential > 0 ? "~" + Math.max(1, potential / cost) + " rolls" : "";
 		int color = potential > 0 ? (VmaClientConfigs.isAutoRerollEnabled() ? TEXT_COLOR : DISABLED_COLOR) : WARN_COLOR;
-		drawString(poseStack, left, x + RerollPanelLayout.PAD_X, layout.potentialY + 1, color);
+		drawString(poseStack, left, x + RerollPanelLayout.PAD_X, layout.potentialY + 3, color);
 		if (!right.isEmpty()) {
-			drawRight(poseStack, right, x + width - RerollPanelLayout.PAD_X, layout.potentialY + 1, MUTED_COLOR);
+			drawRight(poseStack, right, x + width - RerollPanelLayout.PAD_X, layout.potentialY + 3, MUTED_COLOR);
 		}
 	}
 
@@ -625,9 +664,9 @@ public final class RerollPanel {
 			GuiComponent.fill(poseStack, layout.x, y, layout.x + RerollPanelLayout.WIDTH,
 					y + RerollPanelLayout.ROW_H, HOVER_COLOR);
 		}
-		drawString(poseStack, "[" + (enabled ? "x" : " ") + "]", x + RerollPanelLayout.PAD_X, y + 1,
+		drawString(poseStack, "[" + (enabled ? "x" : " ") + "]", x + RerollPanelLayout.PAD_X, y + 3,
 				enabled ? ACCENT_COLOR : DISABLED_COLOR);
-		drawString(poseStack, label, x + 30, y + 1, enabled ? TEXT_COLOR : DISABLED_COLOR);
+		drawString(poseStack, label, x + 30, y + 3, enabled ? TEXT_COLOR : DISABLED_COLOR);
 	}
 
 	private void drawButton(PoseStack poseStack, RerollPanelLayout layout, AutoRerollEngine engine, boolean canStart,
@@ -648,10 +687,10 @@ public final class RerollPanel {
 		} else {
 			color = DISABLED_COLOR;
 		}
-		drawCentered(poseStack, label, layout.x + RerollPanelLayout.WIDTH / 2, layout.buttonY + 2, color);
+		drawCentered(poseStack, label, layout.x + RerollPanelLayout.WIDTH / 2, layout.buttonY + 3, color);
 	}
 
-	private void drawStatus(PoseStack poseStack, RerollPanelLayout layout, boolean noCandidates) {
+	private void drawStatus(PoseStack poseStack, RerollPanelLayout layout, boolean noCandidates, int mouseX, int mouseY) {
 		AutoRerollEngine engine = AutoRerollEngine.getInstance();
 		String text;
 		int color;
@@ -683,8 +722,15 @@ public final class RerollPanel {
 			text = "Ready · any roll";
 			color = ACCENT_COLOR;
 		}
-		drawString(poseStack, truncate(text, (RerollPanelLayout.WIDTH - RerollPanelLayout.PAD_X * 2) / 7),
-				layout.x + RerollPanelLayout.PAD_X, layout.statusY + 1, color);
+		String full = text;
+		int maxChars = (RerollPanelLayout.WIDTH - RerollPanelLayout.PAD_X * 2) / 7;
+		if (text.length() > maxChars) {
+			text = truncate(text, maxChars);
+			if (mouseY >= layout.statusY && mouseY < layout.statusY + RerollPanelLayout.ROW_H) {
+				hoverTooltip(full, mouseX, mouseY);
+			}
+		}
+		drawString(poseStack, text, layout.x + RerollPanelLayout.PAD_X, layout.statusY + 3, color);
 	}
 
 	private void drawDropdown(PoseStack poseStack, RerollPanelLayout layout, List<GearModificationAction> operations,
@@ -702,11 +748,11 @@ public final class RerollPanel {
 		GuiComponent.fill(poseStack, layout.x, layout.dropdownY, layout.x + RerollPanelLayout.WIDTH,
 				layout.dropdownY + 1, GOLD_COLOR);
 		String header = operationDropdown ? "Operations" : "Modifiers";
-		drawCentered(poseStack, header, layout.x + RerollPanelLayout.WIDTH / 2, layout.dropdownY + 1, GOLD_COLOR);
+		drawCentered(poseStack, header, layout.x + RerollPanelLayout.WIDTH / 2, layout.dropdownY + 3, GOLD_COLOR);
 		boolean scrollable = count > visible;
-		drawTriangle(poseStack, layout.x + 7, layout.dropdownY + 5, true,
+		drawTriangle(poseStack, layout.x + 7, layout.dropdownY + 6, true,
 				scrollable && dropdownScroll > 0 ? TEXT_COLOR : DISABLED_COLOR);
-		drawTriangle(poseStack, layout.x + RerollPanelLayout.WIDTH - 7, layout.dropdownY + 5, false,
+		drawTriangle(poseStack, layout.x + RerollPanelLayout.WIDTH - 7, layout.dropdownY + 6, false,
 				scrollable && dropdownScroll < count - visible ? TEXT_COLOR : DISABLED_COLOR);
 
 		for (int slot = 0; slot < visible; slot++) {
@@ -737,14 +783,18 @@ public final class RerollPanel {
 			int baseColor = current ? GOLD_COLOR : (VmaClientConfigs.isAutoRerollEnabled() ? TEXT_COLOR : DISABLED_COLOR);
 			int rangeX = rect.x() + rect.width() - RerollPanelLayout.PAD_X;
 			int rangeWidth = range.isEmpty() ? 0 : font().width(range);
-			int nameMax = rect.x() + rect.width() - RerollPanelLayout.PAD_X - rangeWidth - 6;
+			int nameMax = rect.x() + rect.width() - RerollPanelLayout.PAD_X - rangeWidth - 8;
 			if (current) {
-				drawString(poseStack, ">", rect.x() + 1, rect.y() + 1, GOLD_COLOR);
+				drawString(poseStack, ">", rect.x() + 2, rect.y() + 3, GOLD_COLOR);
 			}
-			drawString(poseStack, truncate(name, Math.max(8, (nameMax - rect.x()) / 7)), rect.x() + 9,
-					rect.y() + 1, baseColor);
+			String fullName = name;
+			String shownName = truncate(name, Math.max(8, (nameMax - rect.x()) / 7));
+			if (!shownName.equals(fullName) && hovered) {
+				hoverTooltip(fullName, mouseX, mouseY);
+			}
+			drawString(poseStack, shownName, rect.x() + 11, rect.y() + 3, baseColor);
 			if (!range.isEmpty()) {
-				drawRight(poseStack, range, rangeX, rect.y() + 1, MUTED_COLOR);
+				drawRight(poseStack, range, rangeX, rect.y() + 3, MUTED_COLOR);
 			}
 		}
 	}
@@ -787,17 +837,19 @@ public final class RerollPanel {
 
 	private void stepMin(RerollPanelLayout layout, double delta) {
 		RollRange range = currentTargetRange();
-		if (!range.numeric()) {
-			return;
-		}
 		thresholdEnabled = true;
-		thresholdValue = Mth.clamp(thresholdValue + delta, range.min(), range.max());
+		if (range.numeric()) {
+			thresholdValue = Mth.clamp(thresholdValue + delta, range.min(), range.max());
+		} else {
+			thresholdValue = Math.max(0.0, thresholdValue + delta);
+		}
 		minInputText = formatDisplay(thresholdValue, false);
 		minInputFocused = false;
 	}
 
 	private double currentStep() {
-		return currentTargetRange().step();
+		double step = currentTargetRange().step();
+		return step > 0.0 ? step : 1.0;
 	}
 
 	// ------------------------------------------------------------------ model
@@ -924,6 +976,86 @@ public final class RerollPanel {
 		} catch (NumberFormatException ignored) {
 			return null;
 		}
+	}
+
+	// ----------------------------------------------------------------- tooltip
+
+	/** Records a hover popover for text that does not fit its row (full text on hover). */
+	private void hoverTooltip(String fullText, int mouseX, int mouseY) {
+		if (fullText == null || fullText.isEmpty()) {
+			return;
+		}
+		pendingTooltip = fullText;
+		tooltipX = mouseX;
+		tooltipY = mouseY;
+	}
+
+	/** Draws the recorded popover (racing the cursor, clamped to the screen) after the panel frame. */
+	private void drawTooltip(PoseStack poseStack) {
+		if (pendingTooltip == null) {
+			return;
+		}
+		net.minecraft.client.gui.Font font = font();
+		List<String> lines = wrapText(pendingTooltip, 190);
+		int boxWidth = 0;
+		for (String line : lines) {
+			boxWidth = Math.max(boxWidth, font.width(line));
+		}
+		boxWidth += 8;
+		int boxHeight = lines.size() * font.lineHeight + 8;
+		int screenWidth = Minecraft.getInstance().screen.width;
+		int screenHeight = Minecraft.getInstance().screen.height;
+		int boxX = Math.min(tooltipX + 8, Math.max(2, screenWidth - boxWidth - 4));
+		int boxY = tooltipY + 10;
+		if (boxY + boxHeight > screenHeight - 4) {
+			boxY = Math.max(2, tooltipY - boxHeight - 6);
+		}
+		GuiComponent.fill(poseStack, boxX, boxY, boxX + boxWidth, boxY + boxHeight, 0xF0101010);
+		GuiComponent.fill(poseStack, boxX, boxY, boxX + boxWidth, boxY + 1, BORDER_COLOR);
+		GuiComponent.fill(poseStack, boxX, boxY + boxHeight - 1, boxX + boxWidth, boxY + boxHeight, BORDER_COLOR);
+		GuiComponent.fill(poseStack, boxX, boxY, boxX + 1, boxY + boxHeight, BORDER_COLOR);
+		GuiComponent.fill(poseStack, boxX + boxWidth - 1, boxY, boxX + boxWidth, boxY + boxHeight, BORDER_COLOR);
+		int lineY = boxY + 4;
+		for (String line : lines) {
+			drawString(poseStack, line, boxX + 3, lineY, TEXT_COLOR);
+			lineY += font.lineHeight;
+		}
+	}
+
+	/** Word-wraps {@code text} so no line is wider than {@code maxWidth} pixels. */
+	private static List<String> wrapText(String text, int maxWidth) {
+		List<String> lines = new ArrayList<>();
+		if (text == null || text.isEmpty()) {
+			return lines;
+		}
+		StringBuilder line = new StringBuilder();
+		for (String word : text.split(" ")) {
+			if (!line.isEmpty() && font().width(line + " " + word) > maxWidth) {
+				lines.add(line.toString());
+				line.setLength(0);
+			}
+			if (line.isEmpty() && font().width(word) > maxWidth) {
+				String rest = word;
+				while (font().width(rest) > maxWidth) {
+					int cut = Math.max(1, rest.length() - 1);
+					while (cut > 1 && font().width(rest.substring(0, cut)) > maxWidth) {
+						cut--;
+					}
+					lines.add(rest.substring(0, cut));
+					rest = rest.substring(cut);
+				}
+				line.append(rest);
+			} else {
+				if (!line.isEmpty()) {
+					line.append(' ');
+				}
+				line.append(word);
+			}
+		}
+		if (!line.isEmpty()) {
+			lines.add(line.toString());
+		}
+		return lines;
 	}
 
 	private static net.minecraft.client.gui.Font font() {
