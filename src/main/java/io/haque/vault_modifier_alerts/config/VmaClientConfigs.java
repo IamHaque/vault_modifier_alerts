@@ -29,6 +29,13 @@ public final class VmaClientConfigs {
 	public static final ForgeConfigSpec.BooleanValue HUD_ORDERING_ENABLED;
 	public static final ForgeConfigSpec.BooleanValue HUD_ORDERING_DESCENDING;
 
+	public static final ForgeConfigSpec.BooleanValue DOWNED_ALERTS_ENABLED;
+	public static final ForgeConfigSpec.ConfigValue<String> DOWNED_SOUND_EVENT;
+	public static final ForgeConfigSpec.BooleanValue DOWNED_LOCAL_SOUND_ENABLED;
+	public static final ForgeConfigSpec.BooleanValue DOWNED_TEAMMATE_SOUND_ENABLED;
+	public static final ForgeConfigSpec.DoubleValue DOWNED_VOLUME;
+	public static final ForgeConfigSpec.DoubleValue DOWNED_PITCH;
+
 	static {
 		ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
 
@@ -50,6 +57,16 @@ public final class VmaClientConfigs {
 		builder.push("HUD Ordering");
 		HUD_ORDERING_ENABLED = builder.define("enabled", true);
 		HUD_ORDERING_DESCENDING = builder.define("sortTemporalDescending", true);
+		builder.pop();
+
+		builder.push("Downed Alerts");
+		DOWNED_ALERTS_ENABLED = builder.define("enabled", true);
+		DOWNED_SOUND_EVENT = builder.define("soundEvent", VmaReference.DOWNED_SOUND_EVENT_NAMESPACED,
+				VmaClientConfigs::isValidSoundEventId);
+		DOWNED_LOCAL_SOUND_ENABLED = builder.define("localPlayerDownedSoundEnabled", true);
+		DOWNED_TEAMMATE_SOUND_ENABLED = builder.define("teammateDownedSoundEnabled", true);
+		DOWNED_VOLUME = builder.defineInRange("volume", 1.0D, 0.0D, 2.0D);
+		DOWNED_PITCH = builder.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
 		builder.pop();
 
 		SPEC = builder.build();
@@ -82,6 +99,22 @@ public final class VmaClientConfigs {
 		return HUD_ORDERING_ENABLED.get();
 	}
 
+	public static boolean isDownedAlertsEnabled() {
+		return DOWNED_ALERTS_ENABLED.get();
+	}
+
+	public static boolean isLocalPlayerDownedSoundEnabled() {
+		return DOWNED_LOCAL_SOUND_ENABLED.get();
+	}
+
+	public static boolean isTeammateDownedSoundEnabled() {
+		return DOWNED_TEAMMATE_SOUND_ENABLED.get();
+	}
+
+	public static String downedSoundEvent() {
+		return DOWNED_SOUND_EVENT.get();
+	}
+
 	public static List<String> watchedModifiers() {
 		List<String> result = new ArrayList<>();
 		for (String raw : WATCHED_MODIFIERS.get()) {
@@ -99,6 +132,10 @@ public static String resolveSoundEventId(ResourceLocation modifierId) {
 	}
 
 	private static boolean isValidModifierId(Object value) {
+		return value instanceof String s && ResourceLocation.tryParse(s) != null;
+	}
+
+	private static boolean isValidSoundEventId(Object value) {
 		return value instanceof String s && ResourceLocation.tryParse(s) != null;
 	}
 

@@ -2,6 +2,7 @@ package io.haque.vault_modifier_alerts.event;
 
 import io.haque.vault_modifier_alerts.VmaReference;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
+import io.haque.vault_modifier_alerts.feature.downed.DownedAlertEngine;
 import io.haque.vault_modifier_alerts.feature.expiry.ExpiryAlertEngine;
 import io.haque.vault_modifier_alerts.tracker.ModifierTracker;
 import iskallia.vault.core.vault.ClientVaults;
@@ -25,11 +26,12 @@ public final class ClientTickEvents {
 		if (event.phase != TickEvent.Phase.END) {
 			return;
 		}
-		if (!VmaClientConfigs.isExpiryAlertsEnabled()) {
-			return;
-		}
 		Minecraft minecraft = Minecraft.getInstance();
 		if (minecraft.player == null) {
+			return;
+		}
+		DownedAlertEngine.getInstance().evaluate();
+		if (!VmaClientConfigs.isExpiryAlertsEnabled()) {
 			return;
 		}
 		ModifierTracker tracker = ModifierTracker.getInstance();

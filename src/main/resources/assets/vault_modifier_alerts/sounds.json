@@ -6,5 +6,13 @@
         "name": "vault_modifier_alerts:vault/champ_domain_expired"
       }
     ]
+  },
+  "downed_alert": {
+    "subtitle": "vault_modifier_alerts.subtitle.downed_alert",
+    "sounds": [
+      {
+        "name": "vault_modifier_alerts:vault/downed_alert"
+      }
+    ]
   }
 }

@@ -25,6 +25,8 @@ public final class VaultModifierAlerts {
 		DeferredRegister<SoundEvent> sounds = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MOD_ID);
 		sounds.register(VmaReference.SOUND_EVENT_ID, () -> new SoundEvent(
 				ResourceLocation.tryParse(MOD_ID + ":" + VmaReference.SOUND_EVENT_ID)));
+		sounds.register(VmaReference.DOWNED_SOUND_EVENT_ID, () -> new SoundEvent(
+				ResourceLocation.tryParse(VmaReference.DOWNED_SOUND_EVENT_NAMESPACED)));
 		sounds.register(modBus);
 
 		ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, VmaClientConfigs.SPEC,
