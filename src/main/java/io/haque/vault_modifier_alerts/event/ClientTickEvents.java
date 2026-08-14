@@ -4,7 +4,10 @@ import io.haque.vault_modifier_alerts.VmaReference;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.downed.DownedAlertEngine;
 import io.haque.vault_modifier_alerts.feature.expiry.ExpiryAlertEngine;
+import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
+import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
 import io.haque.vault_modifier_alerts.tracker.ModifierTracker;
+import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.core.vault.ClientVaults;
 import iskallia.vault.core.vault.Vault;
 import net.minecraft.client.Minecraft;
@@ -31,6 +34,12 @@ public final class ClientTickEvents {
 			return;
 		}
 		DownedAlertEngine.getInstance().evaluate();
+		AutoRerollEngine.getInstance().evaluate();
+		while (KeyBindings.TOGGLE_REROLL_PANEL.consumeClick()) {
+			if (minecraft.screen instanceof VaultArtisanStationScreen) {
+				RerollPanel.getInstance().toggleVisible();
+			}
+		}
 		if (!VmaClientConfigs.isExpiryAlertsEnabled()) {
 			return;
 		}

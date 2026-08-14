@@ -134,6 +134,31 @@ public final class RerollPanel {
 		}
 	}
 
+	/** Selection snapshot used by the Start button and the /vma reroll command. */
+	public record RerollSelection(ResourceLocation operationId, ResourceLocation targetId) {
+	}
+
+	/** @return the current panel selection, or null if no station screen / no valid choice. */
+	public RerollSelection currentSelection() {
+		Minecraft mc = Minecraft.getInstance();
+		if (!(mc.screen instanceof VaultArtisanStationScreen screen)) {
+			return null;
+		}
+		VaultArtisanStationContainer container = (VaultArtisanStationContainer) screen.getMenu();
+		List<GearModificationAction> operations = availableOperations(container);
+		if (operations.isEmpty()) {
+			return null;
+		}
+		ItemStack gear = container.getGearInputSlot().getItem();
+		clampSelections(operations, gear);
+		GearModificationAction operation = operations.get(operationIndex);
+		ResourceLocation targetId = currentTargetId(gear, operation);
+		if (targetId == null) {
+			return null;
+		}
+		return new RerollSelection(operation.modification().getRegistryName(), targetId);
+	}
+
 	/** @return true if the click was consumed by the panel. */
 	public boolean handleClick(VaultArtisanStationScreen screen, int mouseX, int mouseY, int button) {
 		if (!visible || !VmaClientConfigs.isAutoRerollEnabled() || button != 0) {
@@ -176,8 +201,10 @@ public final class RerollPanel {
 			if (engine.isRunning()) {
 				engine.stop(StopReason.STOPPED, false);
 			} else {
-				engine.start(operations.get(operationIndex).modification().getRegistryName(),
-						currentTargetId(gear, operations.get(operationIndex)));
+				RerollSelection selection = currentSelection();
+				if (selection != null) {
+					engine.start(selection.operationId(), selection.targetId());
+				}
 			}
 			return true;
 		}

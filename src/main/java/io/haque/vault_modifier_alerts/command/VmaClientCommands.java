@@ -4,6 +4,9 @@ import com.mojang.brigadier.Command;
 import io.haque.vault_modifier_alerts.VmaReference;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.order.ModifierOrdering;
+import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
+import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine.StopReason;
+import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
 import io.haque.vault_modifier_alerts.tracker.ModifierTracker;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -32,6 +35,9 @@ public final class VmaClientCommands {
 				.then(Commands.literal("sound")
 						.then(Commands.literal("on").executes(ctx -> setSound(ctx.getSource(), true)))
 						.then(Commands.literal("off").executes(ctx -> setSound(ctx.getSource(), false))))
+				.then(Commands.literal("reroll")
+						.then(Commands.literal("start").executes(ctx -> rerollStart(ctx.getSource())))
+						.then(Commands.literal("stop").executes(ctx -> rerollStop(ctx.getSource()))))
 				.then(Commands.literal("status").executes(ctx -> status(ctx.getSource()))));
 	}
 
@@ -44,6 +50,34 @@ public final class VmaClientCommands {
 	private static int setSound(CommandSourceStack source, boolean value) {
 		VmaClientConfigs.setAlertSoundEnabled(value);
 		source.sendSuccess(new TextComponent("[VMA] Expiry sounds " + (value ? "enabled" : "disabled")), false);
+		return Command.SINGLE_SUCCESS;
+	}
+
+	private static int rerollStart(CommandSourceStack source) {
+		RerollPanel.RerollSelection selection = RerollPanel.getInstance().currentSelection();
+		if (selection == null) {
+			source.sendFailure(new TextComponent("[VMA] Open the Artisan Station and pick a target first"));
+			return 0;
+		}
+		AutoRerollEngine engine = AutoRerollEngine.getInstance();
+		if (engine.isRunning()) {
+			source.sendFailure(new TextComponent("[VMA] Auto-reroll is already running"));
+			return 0;
+		}
+		engine.start(selection.operationId(), selection.targetId());
+		source.sendSuccess(new TextComponent("[VMA] Auto-reroll started: " + selection.operationId() + " -> "
+				+ selection.targetId()), false);
+		return Command.SINGLE_SUCCESS;
+	}
+
+	private static int rerollStop(CommandSourceStack source) {
+		AutoRerollEngine engine = AutoRerollEngine.getInstance();
+		if (!engine.isRunning()) {
+			source.sendFailure(new TextComponent("[VMA] Auto-reroll is not running"));
+			return 0;
+		}
+		engine.stop(StopReason.STOPPED, false);
+		source.sendSuccess(new TextComponent("[VMA] Auto-reroll stopped"), false);
 		return Command.SINGLE_SUCCESS;
 	}
 
