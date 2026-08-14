@@ -6,6 +6,7 @@ import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine.StopReason
 import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog.Candidate;
 import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog.OperationScope;
 import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog.RollRange;
+import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog.RollTarget;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout.Hit;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout.HitType;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout.Rect;
@@ -33,7 +34,7 @@ import java.util.List;
 public final class RerollPanel {
 
 	public enum DropdownMode {
-		NONE, OPERATION, MODIFIER
+		NONE, OPERATION, MODIFIER, TARGETS
 	}
 
 	private static final int BG_COLOR = 0xEE111111;
@@ -54,10 +55,10 @@ public final class RerollPanel {
 
 	private boolean visible = true;
 	private int operationIndex;
-	private int targetIndex;
+	private final List<RollTarget> targets = new ArrayList<>();
+	private int focusedTarget = -1;
+	private AutoRerollEngine.StopCondition stopCondition = AutoRerollEngine.StopCondition.ANY;
 	private String minInputText = "";
-	private boolean thresholdEnabled;
-	private double thresholdValue;
 	private boolean minInputFocused;
 	private DropdownMode dropdownMode = DropdownMode.NONE;
 	private int dropdownScroll;
@@ -113,20 +114,17 @@ public final class RerollPanel {
 		return operationIndex;
 	}
 
-	public int targetIndex() {
-		return targetIndex;
-	}
-
 	public double thresholdValue() {
-		return thresholdValue;
+		RollTarget target = focused();
+		return target == null ? 0.0 : target.thresholdValue();
 	}
 
 	/** Selection snapshot used by the Start button and the /vma reroll command. */
-	public record RerollSelection(ResourceLocation operationId, ResourceLocation targetId, boolean thresholdEnabled,
-			double thresholdValue) {
+	public record RerollSelection(ResourceLocation operationId, List<RollTarget> targets,
+			AutoRerollEngine.StopCondition stopCondition) {
 	}
 
-	/** @return the current panel selection, or null if no station screen / no valid choice. */
+	/** @return the current panel selection, or null if no station screen / no target chosen. */
 	public RerollSelection currentSelection() {
 		Minecraft mc = Minecraft.getInstance();
 		if (!(mc.screen instanceof VaultArtisanStationScreen screen)) {
@@ -136,15 +134,12 @@ public final class RerollPanel {
 		if (operations.isEmpty()) {
 			return null;
 		}
-		ItemStack gear = stationGear();
-		clampSelections(operations, gear);
-		GearModificationAction operation = operations.get(operationIndex);
-		ResourceLocation targetId = currentTargetId(gear, operation);
-		if (targetId == null) {
+		clampSelections(operations, stationGear());
+		if (targets.isEmpty()) {
 			return null;
 		}
-		return new RerollSelection(operation.modification().getRegistryName(), targetId, thresholdEnabled,
-				thresholdValue);
+		return new RerollSelection(operations.get(operationIndex).modification().getRegistryName(),
+				List.copyOf(targets), stopCondition);
 	}
 
 	/** All re-roll operations the station offers for the selected tab scope. */
@@ -170,24 +165,65 @@ public final class RerollPanel {
 			return;
 		}
 		operationIndex = index;
-		targetIndex = 0;
-		resetMinInput();
+		minInputFocused = false;
 	}
 
-	public void selectTarget(int index) {
-		targetIndex = index;
-		resetMinInput();
+	/**
+	 * Toggles a candidate from the picker in or out of the watch list. Adding
+	 * appends with no threshold and focuses it; removing shifts focus to a
+	 * remaining target.
+	 */
+	public void toggleTarget(ResourceLocation id) {
+		for (int i = 0; i < targets.size(); i++) {
+			if (targets.get(i).id().equals(id)) {
+				targets.remove(i);
+				if (focusedTarget == i) {
+					focusedTarget = targets.isEmpty() ? -1 : Math.min(i, targets.size() - 1);
+				} else if (focusedTarget > i) {
+					focusedTarget--;
+				}
+				minInputFocused = false;
+				return;
+			}
+		}
+		targets.add(new RollTarget(id, false, 0.0));
+		focusedTarget = targets.size() - 1;
+		minInputFocused = false;
+	}
+
+	public void focusTarget(int index) {
+		if (index >= 0 && index < targets.size()) {
+			focusedTarget = index;
+		}
+		minInputFocused = false;
+	}
+
+	public void removeTarget(int index) {
+		if (index < 0 || index >= targets.size()) {
+			return;
+		}
+		targets.remove(index);
+		if (focusedTarget == index) {
+			focusedTarget = targets.isEmpty() ? -1 : Math.min(index, targets.size() - 1);
+		} else if (focusedTarget > index) {
+			focusedTarget--;
+		}
+		minInputFocused = false;
 	}
 
 	/**
 	 * Commits the field text. A valid number is always kept: it is clamped to
-	 * the target's roll range when that range is known, and used as-is when the
-	 * range could not be read (the engine compares "at least X" either way).
+	 * the focused target's roll range when that range is known, and used as-is
+	 * when the range could not be read (the engine compares "at least X" either
+	 * way).
 	 */
 	public void commitMinInput() {
+		RollTarget target = focused();
+		if (target == null) {
+			return;
+		}
 		if (minInputText.isEmpty()) {
-			thresholdEnabled = false;
-			thresholdValue = 0;
+			setFocusedThreshold(false, 0.0);
 			return;
 		}
 		RollRange range = currentTargetRange();
@@ -195,19 +231,22 @@ public final class RerollPanel {
 		Double parsed = safeParseOrNull(text);
 		if (parsed == null) {
 			minInputText = "";
-			thresholdEnabled = false;
-			thresholdValue = 0;
+			setFocusedThreshold(false, 0.0);
 			return;
 		}
-		thresholdEnabled = true;
-		thresholdValue = range.numeric() ? Mth.clamp(parsed, range.min(), range.max()) : parsed;
-		minInputText = formatDisplay(thresholdValue, false);
+		setFocusedThreshold(true, range.numeric() ? Mth.clamp(parsed, range.min(), range.max()) : parsed);
+		minInputText = formatDisplay(thresholdValue(), false);
 	}
 
-	public void resetMinInput() {
-		minInputText = "";
-		thresholdEnabled = false;
-		thresholdValue = 0;
+	private RollTarget focused() {
+		return focusedTarget >= 0 && focusedTarget < targets.size() ? targets.get(focusedTarget) : null;
+	}
+
+	private void setFocusedThreshold(boolean enabled, double value) {
+		RollTarget target = focused();
+		if (target != null) {
+			targets.set(focusedTarget, new RollTarget(target.id(), enabled, value));
+		}
 	}
 
 	/**
@@ -338,15 +377,17 @@ public final class RerollPanel {
 		boolean enabled = VmaClientConfigs.isAutoRerollEnabled();
 		drawRow(poseStack, layout, "Focus", displayOperationName(operation), layout.focusY, mouseX, mouseY,
 				dropdownMode == DropdownMode.OPERATION);
-		drawModifierRow(poseStack, layout, candidates, mouseX, mouseY);
+		drawModifierRow(poseStack, layout, mouseX, mouseY);
+		drawTargetsRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawMinRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawRangeRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawPotentialRow(poseStack, layout, x, width, operation);
 		drawToggleRow(poseStack, layout, x, "Auto-reroll", enabled, layout.rerollToggleY, mouseX, mouseY);
 		drawToggleRow(poseStack, layout, x, "Auto-reset potential",
 				VmaClientConfigs.isAutoResetPotentialEnabled(), layout.resetToggleY, mouseX, mouseY);
-		drawButton(poseStack, layout, engine, canStart(candidates), mouseX, mouseY);
+		drawButton(poseStack, layout, engine, canStart(), mouseX, mouseY);
 		drawStatus(poseStack, layout, candidates.isEmpty(), mouseX, mouseY);
+		drawCounterRow(poseStack, layout, engine);
 
 		if (dropdownMode != DropdownMode.NONE) {
 			drawDropdown(poseStack, layout, operations, candidates, mouseX, mouseY);
@@ -387,6 +428,16 @@ public final class RerollPanel {
 				loseMinFocus();
 				toggleDropdown(DropdownMode.MODIFIER, candidateCount);
 			}
+			case TARGETS_ROW -> {
+				loseMinFocus();
+				toggleDropdown(DropdownMode.TARGETS, targets.size());
+			}
+			case TARGETS_CHIP -> {
+				loseMinFocus();
+				closeDropdown();
+				stopCondition = stopCondition == AutoRerollEngine.StopCondition.ANY
+						? AutoRerollEngine.StopCondition.ALL : AutoRerollEngine.StopCondition.ANY;
+			}
 			case MIN_DEC -> stepMin(layout, -currentStep());
 			case MIN_INC -> stepMin(layout, currentStep());
 			case MIN_FIELD -> toggleMinFocus();
@@ -408,11 +459,10 @@ public final class RerollPanel {
 				AutoRerollEngine engine = AutoRerollEngine.getInstance();
 				if (engine.isRunning()) {
 					engine.stop(StopReason.STOPPED, false);
-				} else if (canStart(candidates(gear, operations.get(operationIndex)))) {
+				} else if (canStart()) {
 					RerollSelection selection = currentSelection();
 					if (selection != null) {
-						engine.start(selection.operationId(), selection.targetId(), selection.thresholdEnabled(),
-								selection.thresholdValue());
+						engine.start(selection.operationId(), selection.targets(), selection.stopCondition());
 					}
 				}
 			}
@@ -427,8 +477,15 @@ public final class RerollPanel {
 					int safeIndex = Math.min(operationIndex, operations.size() - 1);
 					List<Candidate> targets = candidates(gear, operations.get(safeIndex));
 					if (realIndex >= 0 && realIndex < targets.size()) {
-						selectTarget(realIndex);
+						toggleTarget(targets.get(realIndex).id());
 						closeDropdown();
+					}
+				} else if (dropdownMode == DropdownMode.TARGETS && realIndex >= 0 && realIndex < this.targets.size()) {
+					Rect itemRect = layout.dropdownItem(hit.index());
+					if (itemRect != null && mouseX >= itemRect.x() + itemRect.width() - 16) {
+						removeTarget(realIndex);
+					} else {
+						focusTarget(realIndex);
 					}
 				}
 			}
@@ -483,13 +540,17 @@ public final class RerollPanel {
 		if (dropdownMode == DropdownMode.OPERATION) {
 			return operations.size();
 		}
+		if (dropdownMode == DropdownMode.TARGETS) {
+			return targets.size();
+		}
 		int safeIndex = Math.min(operationIndex, operations.size() - 1);
 		return candidates(stationGear(), operations.get(safeIndex)).size();
 	}
 
 	private void clampDropdownScroll(int operationCount, int candidateCount) {
 		int count = dropdownMode == DropdownMode.OPERATION ? operationCount
-				: (dropdownMode == DropdownMode.MODIFIER ? candidateCount : 0);
+				: (dropdownMode == DropdownMode.TARGETS ? targets.size()
+						: (dropdownMode == DropdownMode.MODIFIER ? candidateCount : 0));
 		int max = Math.max(0, count - dropdownMaxRows);
 		dropdownScroll = Mth.clamp(dropdownScroll, 0, max);
 	}
@@ -526,8 +587,8 @@ public final class RerollPanel {
 		return new RerollPanelLayout(x, y, dropdownMode != DropdownMode.NONE, count, dropdownScroll, dropdownMaxRows);
 	}
 
-	private boolean canStart(List<Candidate> candidates) {
-		return VmaClientConfigs.isAutoRerollEnabled() && !candidates.isEmpty();
+	private boolean canStart() {
+		return VmaClientConfigs.isAutoRerollEnabled() && !targets.isEmpty();
 	}
 
 	// ------------------------------------------------------------------ draw
@@ -567,9 +628,11 @@ public final class RerollPanel {
 		}
 	}
 
-	/** Modifier row: shows only the modifier name (the "Mod Added Ability Level" prefix is gone). */
-	private void drawModifierRow(PoseStack poseStack, RerollPanelLayout layout, List<Candidate> candidates, int mouseX,
-			int mouseY) {
+	/**
+	 * Modifier row: the "add a target" picker. The dropdown lists every
+	 * rollable modifier; already-watched ones carry a checkmark and click toggles.
+	 */
+	private void drawModifierRow(PoseStack poseStack, RerollPanelLayout layout, int mouseX, int mouseY) {
 		boolean hovered = mouseY >= layout.modifierY && mouseY < layout.modifierY + RerollPanelLayout.ROW_H;
 		if (dropdownMode == DropdownMode.MODIFIER) {
 			GuiComponent.fill(poseStack, layout.x, layout.modifierY, layout.x + RerollPanelLayout.WIDTH,
@@ -580,52 +643,100 @@ public final class RerollPanel {
 		}
 		int color = VmaClientConfigs.isAutoRerollEnabled() ? TEXT_COLOR : DISABLED_COLOR;
 		drawString(poseStack, "Modifier", layout.x + RerollPanelLayout.PAD_X, layout.modifierY + 3, MUTED_COLOR);
-		String name;
-		if (candidates.isEmpty()) {
-			name = "none rollable";
-		} else {
-			name = candidates.get(targetIndex).displayName();
-			int maxChars = (RerollPanelLayout.WIDTH - 62 - RerollPanelLayout.PAD_X * 2) / 7;
-			if (name.length() > maxChars) {
-				String full = name;
-				name = truncate(name, maxChars);
-				if (hovered) {
-					hoverTooltip(full, mouseX, mouseY);
-				}
-			}
-		}
-		drawString(poseStack, name, layout.x + 62, layout.modifierY + 3, color);
+		String placeholder = targets.isEmpty() ? "add a modifier..." : "+ add modifier";
+		drawString(poseStack, placeholder, layout.x + 62, layout.modifierY + 3, color);
 		drawTriangle(poseStack, layout.x + RerollPanelLayout.WIDTH - 8, layout.modifierY + 6, false, color);
+	}
+
+	/**
+	 * Targets row: the focused watch-list target, its count, and the clickable
+	 * stop-condition chip ("any"/"all") on the right.
+	 */
+	private void drawTargetsRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX,
+			int mouseY) {
+		boolean hovered = mouseY >= layout.targetsY && mouseY < layout.targetsY + RerollPanelLayout.ROW_H;
+		boolean chipHovered = hovered && mouseX >= x + width - 24;
+		boolean addHovered = hovered && !chipHovered;
+		if (dropdownMode == DropdownMode.TARGETS) {
+			GuiComponent.fill(poseStack, layout.x, layout.targetsY, layout.x + RerollPanelLayout.WIDTH,
+					layout.targetsY + RerollPanelLayout.ROW_H, HIGHLIGHT_COLOR);
+		} else if (addHovered) {
+			GuiComponent.fill(poseStack, layout.x, layout.targetsY, layout.x + RerollPanelLayout.WIDTH,
+					layout.targetsY + RerollPanelLayout.ROW_H, HOVER_COLOR);
+		}
+		drawString(poseStack, "Targets", layout.x + RerollPanelLayout.PAD_X, layout.targetsY + 3, MUTED_COLOR);
+		String value;
+		RollTarget focused = focused();
+		if (focused == null) {
+			value = targets.isEmpty() ? "none" : "?";
+		} else {
+			value = targetName(focused.id());
+		}
+		String full = value;
+		int maxChars = (RerollPanelLayout.WIDTH - 62 - 28 - RerollPanelLayout.PAD_X) / 7;
+		boolean truncated = value.length() > maxChars;
+		if (truncated) {
+			value = truncate(value, maxChars);
+		}
+		int color = VmaClientConfigs.isAutoRerollEnabled() ? TEXT_COLOR : DISABLED_COLOR;
+		drawString(poseStack, value, layout.x + 62, layout.targetsY + 3, color);
+		if (hovered && !chipHovered && truncated) {
+			hoverTooltip(full, mouseX, mouseY);
+		}
+		GuiComponent.fill(poseStack, x + width - 24, layout.targetsY, x + width,
+				layout.targetsY + RerollPanelLayout.ROW_H,
+				chipHovered ? HOVER_COLOR : 0xF0181818);
+		drawString(poseStack, stopCondition == AutoRerollEngine.StopCondition.ANY ? "any" : "all",
+				x + width - 22, layout.targetsY + 3,
+				chipHovered ? GOLD_COLOR : (VmaClientConfigs.isAutoRerollEnabled() ? MUTED_COLOR : DISABLED_COLOR));
+	}
+
+	/** Last row: how many times crafting potential was auto-reset during the run. */
+	private void drawCounterRow(PoseStack poseStack, RerollPanelLayout layout, AutoRerollEngine engine) {
+		if (!engine.isRunning() || !VmaClientConfigs.isAutoResetPotentialEnabled()) {
+			return;
+		}
+		int resets = engine.potentialResetsThisSession();
+		drawString(poseStack, "Potential reset x " + resets, layout.x + RerollPanelLayout.PAD_X, layout.counterY + 3,
+				MUTED_COLOR);
 	}
 
 	private void drawMinRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX, int mouseY) {
 		RollRange range = currentTargetRange();
 		boolean numeric = range.numeric();
 		boolean enabled = VmaClientConfigs.isAutoRerollEnabled();
+		boolean hasTarget = focused() != null;
 		boolean hoveredDec = mouseY >= layout.minY && mouseY < layout.minY + RerollPanelLayout.ROW_H
 				&& mouseX < x + 16;
 		boolean hoveredInc = mouseY >= layout.minY && mouseY < layout.minY + RerollPanelLayout.ROW_H
 				&& mouseX >= x + width - 16;
 		boolean hoveredField = mouseY >= layout.minY && mouseY < layout.minY + RerollPanelLayout.ROW_H
 				&& mouseX >= layout.minFieldLeft() && mouseX < layout.minFieldRight();
-		int arrowColor = enabled ? MUTED_COLOR : DISABLED_COLOR;
-		drawString(poseStack, "-", x + 5, layout.minY + 3, hoveredDec ? TEXT_COLOR : arrowColor);
+		boolean hasThreshold = hasTarget && focused().thresholdEnabled();
+		int buttonColor = enabled ? (hoveredDec ? TEXT_COLOR : MUTED_COLOR) : DISABLED_COLOR;
+		GuiComponent.fill(poseStack, x + 2, layout.minY + 2, x + 14, layout.minY + 12,
+				enabled ? (hoveredDec ? HOVER_COLOR : 0xFF303030) : 0xFF222222);
+		GuiComponent.fill(poseStack, x + width - 14, layout.minY + 2, x + width - 2, layout.minY + 12,
+				enabled ? (hoveredInc ? HOVER_COLOR : 0xFF303030) : 0xFF222222);
+		drawCentered(poseStack, "-", x + 8, layout.minY + 3, buttonColor);
+		drawCentered(poseStack, "+", x + width - 8, layout.minY + 3, buttonColor);
 		drawString(poseStack, "Min", x + 22, layout.minY + 3, MUTED_COLOR);
-		drawString(poseStack, "+", x + 196, layout.minY + 3, hoveredInc ? TEXT_COLOR : arrowColor);
-		if (minInputFocused || thresholdEnabled) {
+		if (minInputFocused || hasThreshold) {
 			GuiComponent.fill(poseStack, layout.minFieldLeft(), layout.minY, layout.minFieldRight(),
 					layout.minY + RerollPanelLayout.ROW_H, minInputFocused ? FIELD_FOCUS_COLOR : FIELD_BG_COLOR);
 		}
 		String shown;
-		if (minInputFocused) {
+		if (!hasTarget) {
+			shown = "-";
+		} else if (minInputFocused) {
 			shown = minInputText + ((System.currentTimeMillis() / 500) % 2 == 0 ? "_" : "");
-		} else if (thresholdEnabled) {
-			shown = formatDisplay(thresholdValue, numeric && range.percent());
+		} else if (hasThreshold) {
+			shown = formatDisplay(focused().thresholdValue(), numeric && range.percent());
 		} else {
 			shown = "any";
 		}
-		drawString(poseStack, shown, layout.minFieldLeft() + 2, layout.minY + 3,
-				hoveredField && !minInputFocused ? GOLD_COLOR : TEXT_COLOR);
+		drawString(poseStack, shown, layout.minFieldLeft() + 2, layout.minY + 3, hasTarget
+				? (hoveredField && !minInputFocused ? GOLD_COLOR : TEXT_COLOR) : DISABLED_COLOR);
 	}
 
 	private void drawRangeRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX, int mouseY) {
@@ -703,7 +814,7 @@ public final class RerollPanel {
 			text = value.toString();
 			color = ACCENT_COLOR;
 		} else if (engine.stopReason() != null) {
-			String suffix = engine.rolls() > 0 ? " · " + engine.rolls() + " rolls" : "";
+			String suffix = engine.rolls() > 0 ? " - " + engine.rolls() + " rolls" : "";
 			text = "Stopped: " + stopReasonText(engine.stopReason()) + suffix;
 			color = WARN_COLOR;
 		} else if (!VmaClientConfigs.isAutoRerollEnabled()) {
@@ -715,11 +826,17 @@ public final class RerollPanel {
 		} else if (noCandidates) {
 			text = "No rollable modifiers";
 			color = MUTED_COLOR;
-		} else if (thresholdEnabled) {
-			text = "Ready · min " + formatDisplay(thresholdValue, currentTargetRange().percent());
+		} else if (targets.isEmpty()) {
+			text = "Add a target modifier";
+			color = MUTED_COLOR;
+		} else if (targets.size() == 1 && focused() != null && focused().thresholdEnabled()) {
+			text = "Ready : goal at least " + formatDisplay(focused().thresholdValue(), currentTargetRange().percent());
+			color = ACCENT_COLOR;
+		} else if (targets.size() == 1) {
+			text = "Ready : any roll";
 			color = ACCENT_COLOR;
 		} else {
-			text = "Ready · any roll";
+			text = "Ready : " + targets.size() + " targets";
 			color = ACCENT_COLOR;
 		}
 		String full = text;
@@ -736,9 +853,19 @@ public final class RerollPanel {
 	private void drawDropdown(PoseStack poseStack, RerollPanelLayout layout, List<GearModificationAction> operations,
 			List<Candidate> candidates, int mouseX, int mouseY) {
 		boolean operationDropdown = dropdownMode == DropdownMode.OPERATION;
-		List<String> names = operationDropdown ? operations.stream().map(this::displayOperationName).toList()
-				: candidates.stream().map(Candidate::displayName).toList();
-		int count = names.size();
+		boolean targetDropdown = dropdownMode == DropdownMode.TARGETS;
+		int count;
+		List<String> names;
+		if (operationDropdown) {
+			names = operations.stream().map(this::displayOperationName).toList();
+			count = operations.size();
+		} else if (targetDropdown) {
+			names = targets.stream().map(t -> targetName(t.id())).toList();
+			count = targets.size();
+		} else {
+			names = candidates.stream().map(Candidate::displayName).toList();
+			count = candidates.size();
+		}
 		int visible = layout.dropdownVisibleItems;
 		if (visible == 0) {
 			return;
@@ -747,7 +874,7 @@ public final class RerollPanel {
 				layout.dropdownY + layout.dropdownHeight, 0xF0181818);
 		GuiComponent.fill(poseStack, layout.x, layout.dropdownY, layout.x + RerollPanelLayout.WIDTH,
 				layout.dropdownY + 1, GOLD_COLOR);
-		String header = operationDropdown ? "Operations" : "Modifiers";
+		String header = operationDropdown ? "Operations" : (targetDropdown ? "Targets" : "Modifiers");
 		drawCentered(poseStack, header, layout.x + RerollPanelLayout.WIDTH / 2, layout.dropdownY + 3, GOLD_COLOR);
 		boolean scrollable = count > visible;
 		drawTriangle(poseStack, layout.x + 7, layout.dropdownY + 6, true,
@@ -761,16 +888,19 @@ public final class RerollPanel {
 				break;
 			}
 			Rect rect = layout.dropdownItem(slot);
+			boolean removeZone = targetDropdown && mouseX >= rect.x() + rect.width() - 16 && mouseY >= rect.y()
+					&& mouseY < rect.y() + rect.height();
 			boolean hovered = mouseX >= rect.x() && mouseX < rect.x() + rect.width() && mouseY >= rect.y()
 					&& mouseY < rect.y() + rect.height();
-			boolean current = operationDropdown ? index == operationIndex : index == targetIndex;
+			boolean current = operationDropdown ? index == operationIndex
+					: (targetDropdown ? index == focusedTarget : false);
 			if (hovered) {
 				GuiComponent.fill(poseStack, rect.x(), rect.y(), rect.x() + rect.width(), rect.y() + rect.height(),
-						HOVER_COLOR);
+						removeZone ? 0xFF4A1F1F : HOVER_COLOR);
 			}
 			String name = names.get(index);
 			String range = "";
-			if (!operationDropdown && index < candidates.size()) {
+			if (!operationDropdown && !targetDropdown && index < candidates.size()) {
 				RollRange rollRange = rollRangeOf(candidates.get(index));
 				range = rollRange.displayText();
 			}
@@ -780,12 +910,17 @@ public final class RerollPanel {
 					range = cost + " potential";
 				}
 			}
+			if (targetDropdown) {
+				RollTarget target = targets.get(index);
+				range = target.thresholdEnabled() ? "min " + formatDisplay(target.thresholdValue(), false) : "any";
+			}
 			int baseColor = current ? GOLD_COLOR : (VmaClientConfigs.isAutoRerollEnabled() ? TEXT_COLOR : DISABLED_COLOR);
 			int rangeX = rect.x() + rect.width() - RerollPanelLayout.PAD_X;
 			int rangeWidth = range.isEmpty() ? 0 : font().width(range);
 			int nameMax = rect.x() + rect.width() - RerollPanelLayout.PAD_X - rangeWidth - 8;
-			if (current) {
-				drawString(poseStack, ">", rect.x() + 2, rect.y() + 3, GOLD_COLOR);
+			if (current || (!targetDropdown && !operationDropdown && isWatched(candidates.get(index).id()))) {
+				drawString(poseStack, targetDropdown || operationDropdown ? ">" : "*", rect.x() + 2, rect.y() + 3,
+						GOLD_COLOR);
 			}
 			String fullName = name;
 			String shownName = truncate(name, Math.max(8, (nameMax - rect.x()) / 7));
@@ -793,10 +928,42 @@ public final class RerollPanel {
 				hoverTooltip(fullName, mouseX, mouseY);
 			}
 			drawString(poseStack, shownName, rect.x() + 11, rect.y() + 3, baseColor);
-			if (!range.isEmpty()) {
+			if (!range.isEmpty() && !(targetDropdown && removeZone)) {
 				drawRight(poseStack, range, rangeX, rect.y() + 3, MUTED_COLOR);
 			}
+			if (removeZone) {
+				drawCentered(poseStack, "x", rect.x() + rect.width() - 8, rect.y() + 3, WARN_COLOR);
+			}
 		}
+	}
+
+	private boolean isWatched(ResourceLocation id) {
+		for (RollTarget target : targets) {
+			if (target.id().equals(id)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Display name of a watched target: from the rollable candidates, else humanized id. */
+	private String targetName(ResourceLocation id) {
+		if (id == null) {
+			return "?";
+		}
+		ItemStack gear = stationGear();
+		if (!gear.isEmpty() && Minecraft.getInstance().screen instanceof VaultArtisanStationScreen screen) {
+			List<GearModificationAction> operations = operations(screen);
+			if (!operations.isEmpty()) {
+				int safeIndex = Math.min(operationIndex, operations.size() - 1);
+				for (Candidate candidate : candidates(gear, operations.get(safeIndex))) {
+					if (candidate.id().equals(id)) {
+						return candidate.displayName();
+					}
+				}
+			}
+		}
+		return ModifierCatalog.humanizeId(ModifierCatalog.stripModPrefix(id.getPath()));
 	}
 
 	private RollRange rollRangeOf(Candidate candidate) {
@@ -816,11 +983,11 @@ public final class RerollPanel {
 	// ----------------------------------------------------------------- input
 
 	private void toggleMinFocus() {
-		if (dropdownMode != DropdownMode.NONE) {
+		if (dropdownMode != DropdownMode.NONE || focused() == null) {
 			return;
 		}
 		if (!minInputFocused) {
-			minInputText = thresholdEnabled ? formatDisplay(thresholdValue, false) : "";
+			minInputText = focused().thresholdEnabled() ? formatDisplay(focused().thresholdValue(), false) : "";
 			minInputFocused = true;
 		} else {
 			commitMinInput();
@@ -836,14 +1003,18 @@ public final class RerollPanel {
 	}
 
 	private void stepMin(RerollPanelLayout layout, double delta) {
-		RollRange range = currentTargetRange();
-		thresholdEnabled = true;
-		if (range.numeric()) {
-			thresholdValue = Mth.clamp(thresholdValue + delta, range.min(), range.max());
-		} else {
-			thresholdValue = Math.max(0.0, thresholdValue + delta);
+		if (focused() == null) {
+			return;
 		}
-		minInputText = formatDisplay(thresholdValue, false);
+		RollRange range = currentTargetRange();
+		double value;
+		if (range.numeric()) {
+			value = Mth.clamp(thresholdValue() + delta, range.min(), range.max());
+		} else {
+			value = Math.max(0.0, thresholdValue() + delta);
+		}
+		setFocusedThreshold(true, value);
+		minInputText = formatDisplay(thresholdValue(), false);
 		minInputFocused = false;
 	}
 
@@ -855,6 +1026,10 @@ public final class RerollPanel {
 	// ------------------------------------------------------------------ model
 
 	public RollRange currentTargetRange() {
+		RollTarget target = focused();
+		if (target == null) {
+			return new RollRange(0, 0, 0, false, false);
+		}
 		ItemStack gear = stationGear();
 		if (gear.isEmpty() || !(Minecraft.getInstance().screen instanceof VaultArtisanStationScreen screen)) {
 			return new RollRange(0, 0, 0, false, false);
@@ -864,44 +1039,22 @@ public final class RerollPanel {
 			return new RollRange(0, 0, 0, false, false);
 		}
 		GearModificationAction operation = operations.get(Math.min(operationIndex, operations.size() - 1));
-		List<Candidate> candidates = candidates(gear, operation);
-		if (candidates.isEmpty() || targetIndex >= candidates.size()) {
-			return new RollRange(0, 0, 0, false, false);
-		}
-		return ModifierCatalog.rollRange(gear, candidates.get(targetIndex).id(),
+		return ModifierCatalog.rollRange(gear, target.id(),
 				ModifierCatalog.scopeOfOperation(operation.modification().getRegistryName()));
 	}
 
 	public void clampSelections(List<GearModificationAction> operations, ItemStack gear) {
 		if (operations.isEmpty()) {
 			operationIndex = 0;
-			targetIndex = 0;
+			focusedTarget = -1;
 			return;
 		}
 		if (operationIndex >= operations.size()) {
 			operationIndex = 0;
-			targetIndex = 0;
 		}
-		GearModificationAction operation = operations.get(operationIndex);
-		List<Candidate> candidates = candidates(gear, operation);
-		if (candidates.isEmpty()) {
-			targetIndex = 0;
-			return;
+		if (focusedTarget >= targets.size()) {
+			focusedTarget = targets.isEmpty() ? -1 : targets.size() - 1;
 		}
-		if (targetIndex >= candidates.size()) {
-			targetIndex = 0;
-		}
-	}
-
-	private ResourceLocation currentTargetId(ItemStack gear, GearModificationAction operation) {
-		List<Candidate> candidates = candidates(gear, operation);
-		if (candidates.isEmpty()) {
-			return null;
-		}
-		if (targetIndex >= candidates.size()) {
-			targetIndex = 0;
-		}
-		return candidates.get(targetIndex).id();
 	}
 
 	// ------------------------------------------------------------------ misc

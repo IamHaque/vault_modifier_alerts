@@ -5,6 +5,7 @@ import io.haque.vault_modifier_alerts.VmaReference;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.expiry.AlertSoundPlayer;
 import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog.OperationScope;
+import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog.RollTarget;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.container.VaultArtisanStationContainer;
 import iskallia.vault.gear.attribute.VaultGearModifier;
@@ -34,15 +35,20 @@ public final class AutoRerollEngine {
 		STOPPED
 	}
 
+	public enum StopCondition {
+		ANY, ALL
+	}
+
 	private static final AutoRerollEngine INSTANCE = new AutoRerollEngine();
 
 	private boolean running;
 	private boolean inFlight;
 	private boolean resetUsedThisSession;
+	private int potentialResetsThisSession;
 	private ResourceLocation operationId;
-	private ResourceLocation targetId;
-	private boolean thresholdEnabled;
-	private double thresholdValue;
+	private List<RollTarget> targets = List.of();
+	private StopCondition stopCondition = StopCondition.ANY;
+	private boolean[] allPassed = new boolean[0];
 	private ItemStack lastPressedGear;
 	private VaultArtisanStationContainer.Tab lastSelectedTab;
 	private long lastPressTick;
@@ -57,30 +63,27 @@ public final class AutoRerollEngine {
 		return INSTANCE;
 	}
 
-	public void start(ResourceLocation operation, ResourceLocation target) {
-		start(operation, target, false, 0.0);
-	}
-
-	public void start(ResourceLocation operation, ResourceLocation target, boolean thresholdEnabled,
-			double thresholdValue) {
-		if (operation == null || target == null || !VmaClientConfigs.isAutoRerollEnabled()) {
+	public void start(ResourceLocation operation, List<RollTarget> rollTargets, StopCondition condition) {
+		if (operation == null || rollTargets == null || rollTargets.isEmpty()
+				|| !VmaClientConfigs.isAutoRerollEnabled()) {
 			return;
 		}
 		operationId = operation;
-		targetId = target;
-		this.thresholdEnabled = thresholdEnabled;
-		this.thresholdValue = thresholdValue;
+		targets = List.copyOf(rollTargets);
+		stopCondition = condition == null ? StopCondition.ANY : condition;
+		allPassed = new boolean[targets.size()];
 		running = true;
 		inFlight = false;
 		resetUsedThisSession = false;
+		potentialResetsThisSession = 0;
 		lastPressedGear = null;
 		lastSelectedTab = null;
 		lastPressTick = 0;
 		rolls = 0;
 		stopReason = null;
 		lastTargetValue = 0.0;
-		VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll started: operation={}, target={}, thresholdEnabled={},"
-				+ " thresholdValue={}", operation, target, thresholdEnabled, thresholdValue);
+		VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll started: operation={}, targets={}, condition={}",
+				operation, targets, stopCondition);
 	}
 
 	public void stop(StopReason reason, boolean playSound) {
@@ -159,7 +162,7 @@ public final class AutoRerollEngine {
 		}
 
 		OperationScope scope = ModifierCatalog.scopeOfOperation(operationId);
-		if (scope == null || !ModifierCatalog.isApplicable(gear, targetId, scope)) {
+		if (scope == null || targets.stream().noneMatch(t -> ModifierCatalog.isApplicable(gear, t.id(), scope))) {
 			stop(StopReason.INVALID_TARGET, true);
 			return;
 		}
@@ -187,8 +190,17 @@ public final class AutoRerollEngine {
 		return operationId;
 	}
 
+	/** The first watched target id (convenience; the run may watch several). */
 	public ResourceLocation targetId() {
-		return targetId;
+		return targets.isEmpty() ? null : targets.get(0).id();
+	}
+
+	public List<RollTarget> targets() {
+		return targets;
+	}
+
+	public StopCondition stopCondition() {
+		return stopCondition;
 	}
 
 	public int rolls() {
@@ -197,6 +209,11 @@ public final class AutoRerollEngine {
 
 	public StopReason stopReason() {
 		return stopReason;
+	}
+
+	/** Times crafting potential was auto-reset during the current run. */
+	public int potentialResetsThisSession() {
+		return potentialResetsThisSession;
 	}
 
 	/** The most recent roll value of the target modifier seen during the current run (0 before any roll). */
@@ -236,6 +253,7 @@ public final class AutoRerollEngine {
 			return;
 		}
 		resetUsedThisSession = true;
+		potentialResetsThisSession++;
 		press(station, resetAction, gear);
 	}
 
@@ -265,23 +283,50 @@ public final class AutoRerollEngine {
 	}
 
 	private boolean targetRolled(ItemStack gear) {
-		if (targetId == null) {
+		if (targets.isEmpty() || gear.isEmpty() || !(gear.getItem() instanceof iskallia.vault.gear.item.VaultGearItem)) {
 			return false;
 		}
 		VaultGearData data = VaultGearData.read(gear);
+		boolean all = stopCondition == StopCondition.ALL;
 		for (AffixType affixType : scopeAffixes(ModifierCatalog.scopeOfOperation(operationId))) {
 			for (VaultGearModifier<?> modifier : data.getModifiers(affixType)) {
-				if (!targetId.equals(modifier.getModifierIdentifier())) {
+				int index = indexOfTarget(modifier.getModifierIdentifier());
+				if (index < 0) {
 					continue;
 				}
 				double displayValue = ModifierCatalog.toDisplayUnits(modifier);
+				RollTarget target = targets.get(index);
+				boolean passed = !target.thresholdEnabled() || displayValue >= target.thresholdValue();
 				lastTargetValue = displayValue;
-				VaultModifierAlerts.LOGGER.debug("[VMA] Rolled target value={}, threshold={}", displayValue,
-						thresholdValue);
-				return !thresholdEnabled || displayValue >= thresholdValue;
+				VaultModifierAlerts.LOGGER.debug("[VMA] Rolled target={} value={}, threshold={}, passed={}",
+						target.id(), displayValue, target.thresholdEnabled() ? target.thresholdValue() : null, passed);
+				if (all) {
+					if (passed) {
+						allPassed[index] = true;
+					}
+				} else if (passed) {
+					return true;
+				}
 			}
 		}
-		return false;
+		if (!all) {
+			return false;
+		}
+		for (boolean passed : allPassed) {
+			if (!passed) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private int indexOfTarget(ResourceLocation id) {
+		for (int i = 0; i < targets.size(); i++) {
+			if (targets.get(i).id().equals(id)) {
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	private static AffixType[] scopeAffixes(OperationScope scope) {

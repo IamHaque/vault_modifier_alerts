@@ -200,15 +200,17 @@ protection). Closing the screen stops the run.
 
 ### 4.4 Panel (`RerollPanel`)
 
-> **[see DEC-028 + DEC-029] — superseded by the GUI revamp.** Compact side panel
-> (150×110) with `‹ ›` cycling selectors and raw row-math hit-testing was replaced
-> by a 216px-wide panel with click-to-open dropdown selectors, an Auto-reroll
-> on/off toggle, a min-threshold range hint, a colored potential line with a
-> rolls-left estimate, and a richer rolling/stop status line. All geometry now
-> comes from `RerollPanelLayout` (single source of truth for drawing and input);
-> roll ranges come from the attributes' typed tier configs via the generator API
-> (DEC-029), ability/talent targets are named by the ability they add, and
-> over-long row text shows its full value in a hover popover.
+> **[see DEC-028 + DEC-029 + DEC-030 + DEC-031] — superseded by the GUI revamp.** Compact
+> side panel (150×110) with `‹ ›` cycling selectors and raw row-math hit-testing was
+> replaced by a 216px-wide panel with click-to-open dropdown selectors, an Auto-reroll
+> on/off toggle, a multi-target watch list with per-target mins and an `any`/`all` stop
+> condition, a min-threshold range hint, a colored potential line with a rolls-left
+> estimate, a potential-reset counter, and a richer rolling/stop status line. All geometry
+> comes from `RerollPanelLayout` (single source of truth for drawing and input); roll
+> ranges come from the attributes' typed tier configs via the generator API (DEC-029),
+> effect-avoidance targets show their chance band (DEC-030), ability/talent targets are
+> named by the ability they add, and over-long row text shows its full value in a hover
+> popover.
 
 Compact side panel (≈150×110 px, scale-safe), drawn with vanilla gui drawing calls
 (fill + `drawString`), containing:

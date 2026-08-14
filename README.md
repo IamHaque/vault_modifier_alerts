@@ -83,32 +83,41 @@ the station window — right side preferred, left fallback — so it never obstr
 
 - **Focus** — the re-roll operation: reforge all, reforge prefix / suffix, or reforge
   implicits. Click the row to open a dropdown with the full list.
-- **Modifier** — the target modifier that can actually roll under the selected operation for
-  the gear in the station (impossible targets, e.g. an attack-damage modifier on a helmet, are
-  not offered). Click the row to open a scrollable dropdown with every available modifier,
-  shown with human-readable names and their rollable value ranges. Ability/talent level
-  modifiers are named by the ability they add (e.g. "Ice Bolt") — no "Mod Added Ability
-  Level" prefix wording. Any name or range too long for its row shows its full text on hover.
-- **Min** — an optional minimum threshold: keep rolling until the target rolls at least this
-  value (type it in, or step with the `-`/`+` buttons; the rollable range is shown below the
-  field). The value is always kept, even when the panel cannot read the target's roll range
-  ("Range: ?") — the engine then compares "at least X" without clamping. No threshold = stop
-  on any roll of the target.
+- **Modifier** — the *add-a-target* picker: click to open a scrollable dropdown with every
+  modifier that can actually roll under the selected operation for the gear in the station
+  (impossible targets, e.g. an attack-damage modifier on a helmet, are not offered). Items
+  show human-readable names and their rollable value ranges; already-watched ones carry a
+  `*` and clicking toggles them in/out. The list is alphabetical, with ability/talent level
+  modifiers grouped at the bottom (each group alphabetical); ability targets are named by
+  the ability they add (e.g. "Ice Bolt") and effect-avoidance targets show their chance band
+  (e.g. "10% - 80%"). Any name or range too long for its row shows its full text on hover.
+- **Targets** — your watch list (you can watch several at once). The row shows the focused
+  target and its count; click it to open the list — click a name to focus it for editing,
+  click the `x` on the right to remove it. The chip on the right selects the stop
+  condition: `any` (default — stop when *any* watched target passes) or `all` (stop only
+  after *every* watched target has passed at least once).
+- **Min** — an optional minimum threshold for the *focused* target (each target keeps its
+  own): keep rolling until it rolls at least this value (type it in, or step with the
+  `-`/`+` buttons; the rollable range is shown below the field). The value is always kept,
+  even when the panel cannot read the target's roll range ("Range: ?") — the engine then
+  compares "at least X" without clamping. No threshold = that target passes on any roll.
 - **Auto-reroll** toggle — master switch for the feature, right in the GUI (persists to the
   `enabled` config; turning it off stops any running roll and dims the controls).
 - **Auto-reset potential** checkbox — when the selected operation is disabled for lack of
-  crafting potential, press `reset_potential` (Opportunistic Focus) once per run automatically
-  (config `autoResetPotential`, default `true`).
+  crafting potential, press `reset_potential` (Opportunistic Focus) automatically (config
+  `autoResetPotential`, default `true`). While rolling, a counter at the bottom of the panel
+  shows how many times the potential was reset this run (`Potential reset x N`).
 - **Potential** line — current/max crafting potential plus an estimate of the rolls left.
-- **Status** line — roll counter, the last rolled value of the target, and the stop reason
-  (e.g. `Rolling... #7 (4.2%)`, `Stopped: target rolled · 12 rolls`).
+- **Status** line — roll counter, the last rolled value of the target, the armed goal, and
+  the stop reason (e.g. `Rolling... #7 (4.2%)`, `Ready : goal at least 4`, `Stopped:
+  target rolled - 12 rolls`).
 
 Start / Stop with the panel button or `/vma reroll start|stop` (the command uses the panel's
-current selection). The engine presses the station's own buttons through the same code path
-as a player click; it stops and plays the configured sound (`successSoundEvent` on success,
-`stopSoundEvent` otherwise) on: target rolled, gear removed, out of materials, out of
-potential, target no longer rollable, max rolls reached, no roll detected in time, station
-closed, or manual stop.
+current selection — all watched targets and the stop condition). The engine presses the
+station's own buttons through the same code path as a player click; it stops and plays the
+configured sound (`successSoundEvent` on success, `stopSoundEvent` otherwise) on: any/all
+target(s) passed, gear removed, out of materials, out of potential, no target rollable any
+more, max rolls reached, no roll detected in time, station closed, or manual stop.
 
 Config `[Auto Reroll]` in `config/vault_modifier_alerts-client.toml`:
 

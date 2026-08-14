@@ -23,8 +23,8 @@ public final class RerollPanelLayout {
 	public static final int MAX_DROPDOWN_ROWS = 8;
 
 	public enum HitType {
-		NONE, FOCUS_ROW, MODIFIER_ROW, MIN_DEC, MIN_FIELD, MIN_INC, REROLL_TOGGLE, RESET_TOGGLE, START_BUTTON,
-		DROPDOWN_UP, DROPDOWN_DOWN, DROPDOWN_ITEM
+		NONE, FOCUS_ROW, MODIFIER_ROW, TARGETS_ROW, TARGETS_CHIP, MIN_DEC, MIN_FIELD, MIN_INC, REROLL_TOGGLE,
+		RESET_TOGGLE, START_BUTTON, DROPDOWN_UP, DROPDOWN_DOWN, DROPDOWN_ITEM
 	}
 
 	public record Hit(HitType type, int index) {
@@ -41,6 +41,7 @@ public final class RerollPanelLayout {
 	public final int titleBottom;
 	public final int focusY;
 	public final int modifierY;
+	public final int targetsY;
 	public final int minY;
 	public final int rangeY;
 	public final int potentialY;
@@ -48,6 +49,7 @@ public final class RerollPanelLayout {
 	public final int resetToggleY;
 	public final int buttonY;
 	public final int statusY;
+	public final int counterY;
 	public final int dropdownY;
 	public final int dropdownEnd;
 
@@ -59,14 +61,16 @@ public final class RerollPanelLayout {
 		titleBottom = y + TITLE_H;
 		focusY = titleBottom;
 		modifierY = focusY + ROW_H;
-		minY = modifierY + ROW_H;
+		targetsY = modifierY + ROW_H;
+		minY = targetsY + ROW_H;
 		rangeY = minY + ROW_H;
 		potentialY = rangeY + ROW_H;
 		rerollToggleY = potentialY + ROW_H;
 		resetToggleY = rerollToggleY + ROW_H;
 		buttonY = resetToggleY + ROW_H;
 		statusY = buttonY + BUTTON_H;
-		baseHeight = statusY + ROW_H + BOTTOM_PAD - y;
+		counterY = statusY + ROW_H;
+		baseHeight = counterY + ROW_H + BOTTOM_PAD - y;
 
 		int visible = 0;
 		if (dropdownOpen && dropdownCount > 0) {
@@ -128,6 +132,12 @@ public final class RerollPanelLayout {
 		}
 		if (inside(mouseY, modifierY, ROW_H)) {
 			return new Hit(HitType.MODIFIER_ROW, -1);
+		}
+		if (inside(mouseY, targetsY, ROW_H)) {
+			if (mouseX >= x + WIDTH - 24) {
+				return new Hit(HitType.TARGETS_CHIP, -1);
+			}
+			return new Hit(HitType.TARGETS_ROW, -1);
 		}
 		if (inside(mouseY, minY, ROW_H)) {
 			if (mouseX < x + 16) {

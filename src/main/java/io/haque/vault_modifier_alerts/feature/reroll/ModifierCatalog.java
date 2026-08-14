@@ -16,7 +16,9 @@ import iskallia.vault.gear.attribute.config.ConfigurableAttributeGenerator;
 import iskallia.vault.gear.attribute.config.DoubleAttributeGenerator;
 import iskallia.vault.gear.attribute.config.FloatAttributeGenerator;
 import iskallia.vault.gear.attribute.config.IntegerAttributeGenerator;
+import iskallia.vault.gear.attribute.custom.effect.IEffectAvoidanceChanceAttribute;
 import iskallia.vault.gear.attribute.talent.TalentLevelAttribute;
+import iskallia.vault.gear.data.AttributeGearData;
 import iskallia.vault.gear.data.VaultGearData;
 import iskallia.vault.gear.reader.DecimalModifierReader;
 import iskallia.vault.init.ModConfigs;
@@ -27,6 +29,7 @@ import net.minecraft.util.GsonHelper;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -47,7 +50,12 @@ public final class ModifierCatalog {
 		PREFIX, SUFFIX, IMPLICIT, PREFIX_SUFFIX
 	}
 
-	public record Candidate(ResourceLocation id, String displayName, AffixType affixType, boolean percent) {
+	public record Candidate(ResourceLocation id, String displayName, AffixType affixType, boolean percent,
+			boolean abilityLike) {
+	}
+
+	/** One watched re-roll target with its own optional minimum threshold (display units). */
+	public record RollTarget(ResourceLocation id, boolean thresholdEnabled, double thresholdValue) {
 	}
 
 	/**
@@ -119,9 +127,13 @@ public final class ModifierCatalog {
 				}
 				String displayName = displayName(tierGroup);
 				boolean percent = isPercent(tierGroup);
-				result.add(new Candidate(id, displayName, affixType, percent));
+				result.add(new Candidate(id, displayName, affixType, percent, isAbilityLike(tierGroup)));
 			}
 		}
+		// Two alphabetical groups: regular modifiers first, ability/talent modifiers last.
+		result.sort(Comparator.comparingInt((Candidate c) -> c.abilityLike() ? 1 : 0)
+				.thenComparing(Candidate::displayName, String.CASE_INSENSITIVE_ORDER)
+				.thenComparing(c -> c.id().toString()));
 		return result;
 	}
 
@@ -138,13 +150,26 @@ public final class ModifierCatalog {
 	}
 
 	public static int craftingPotential(ItemStack gear) {
-		return VaultGearData.read(gear).getFirstValue(iskallia.vault.init.ModGearAttributes.CRAFTING_POTENTIAL)
+		return readVaultGearData(gear).getFirstValue(iskallia.vault.init.ModGearAttributes.CRAFTING_POTENTIAL)
 				.orElse(0);
 	}
 
 	public static int maxCraftingPotential(ItemStack gear) {
-		return VaultGearData.read(gear).getFirstValue(iskallia.vault.init.ModGearAttributes.MAX_CRAFTING_POTENTIAL)
+		return readVaultGearData(gear).getFirstValue(iskallia.vault.init.ModGearAttributes.MAX_CRAFTING_POTENTIAL)
 				.orElse(0);
+	}
+
+	/**
+	 * Reads vault-gear data of the given stack, or empty gear data when the
+	 * stack is not a {@link iskallia.vault.gear.item.VaultGearItem}. Only that
+	 * item type stores {@link VaultGearData}; calling {@code VaultGearData.read}
+	 * on tools, jewels, necklaces or card decks throws a ClassCastException.
+	 */
+	public static AttributeGearData readVaultGearData(ItemStack gear) {
+		if (gear == null || gear.isEmpty() || !(gear.getItem() instanceof iskallia.vault.gear.item.VaultGearItem)) {
+			return AttributeGearData.empty();
+		}
+		return VaultGearData.read(gear);
 	}
 
 	private static AffixType[] scopeAffixes(OperationScope scope) {
@@ -166,6 +191,9 @@ public final class ModifierCatalog {
 			return 0.0;
 		}
 		Object value = modifier.getValue();
+		if (value instanceof IEffectAvoidanceChanceAttribute avoidance) {
+			return avoidance.getChance() * 100.0;
+		}
 		if (value instanceof AbilityLevelAttribute ability) {
 			return ability.getLevelChange();
 		}
@@ -217,13 +245,13 @@ public final class ModifierCatalog {
 				if (range == null) {
 					return new RollRange(0, 0, 0, false, percent);
 				}
-				return new RollRange(range.min(), range.max(), range.step(), true, percent);
+				return new RollRange(range.min(), range.max(), range.step(), true, range.percent());
 			}
 		}
 		return new RollRange(0, 0, 0, false, false);
 	}
 
-	private record RangeValue(double min, double max, double step) {
+	private record RangeValue(double min, double max, double step, boolean percent) {
 	}
 
 	/**
@@ -254,7 +282,7 @@ public final class ModifierCatalog {
 				min = Math.min(min, level);
 				max = Math.max(max, level);
 			}
-			return min > max ? null : new RangeValue(min, max, 1);
+			return min > max ? null : new RangeValue(min, max, 1, percent);
 		}
 
 		VaultGearAttribute<?> attribute = attributeOf(tierGroup);
@@ -276,6 +304,12 @@ public final class ModifierCatalog {
 		}
 		Object minValue = minOpt.get();
 		Object maxValue = maxOpt.get();
+		// Effect-avoidance attributes (single effect and list type) yield their value
+		// type as min/max; the shared chance is the rollable band (fraction = percent).
+		if (minValue instanceof IEffectAvoidanceChanceAttribute minAvoidance
+				&& maxValue instanceof IEffectAvoidanceChanceAttribute maxAvoidance) {
+			return new RangeValue(minAvoidance.getChance() * 100.0, maxAvoidance.getChance() * 100.0, 1.0, true);
+		}
 		if (!(minValue instanceof Number minNumber) || !(maxValue instanceof Number maxNumber)) {
 			return null;
 		}
@@ -289,7 +323,7 @@ public final class ModifierCatalog {
 		if (!(step > 0.0)) {
 			step = Math.max(scale, 1.0);
 		}
-		return new RangeValue(min, max, step);
+		return new RangeValue(min, max, step, percent);
 	}
 
 	/** Smallest usable increment: integer ranges expose it, otherwise derive from the roll values. */
@@ -363,7 +397,7 @@ public final class ModifierCatalog {
 		if (step <= 0.0) {
 			step = 1.0;
 		}
-		return new RangeValue(min, max, step);
+		return new RangeValue(min, max, step, percent);
 	}
 
 	private static boolean isPercent(ModifierTierGroup tierGroup) {
@@ -383,9 +417,20 @@ public final class ModifierCatalog {
 		return attribute.getReader() instanceof DecimalModifierReader.Percentage;
 	}
 
+	/** Ability/talent level tiers sort last in the picker (each group alphabetical). */
+	private static boolean isAbilityLike(ModifierTierGroup tierGroup) {
+		for (ModifierTier<?> tier : tierGroup) {
+			Object config = tier.getModifierConfiguration();
+			if (config instanceof AbilityLevelAttribute.Config || config instanceof TalentLevelAttribute.Config) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static String displayName(ModifierTierGroup tierGroup) {
 		VaultGearAttribute<?> attribute = attributeOf(tierGroup);
-		String fallback = humanizeId(tierGroup.getIdentifier().getPath());
+		String fallback = humanizeId(stripModPrefix(tierGroup.getIdentifier().getPath()));
 		for (ModifierTier<?> tier : tierGroup) {
 			Object config = tier.getModifierConfiguration();
 			if (config instanceof AbilityLevelAttribute.Config abilityConfig) {
@@ -441,6 +486,11 @@ public final class ModifierCatalog {
 		}
 		String lower = key.toLowerCase(Locale.ROOT);
 		return lower.endsWith("_base") ? key.substring(0, key.length() - 5) : key;
+	}
+
+	/** Strips the "mod_" id prefix that reads badly in names ("mod_effect_avoidance" -> "effect_avoidance"). */
+	public static String stripModPrefix(String path) {
+		return path != null && path.startsWith("mod_") ? path.substring(4) : path;
 	}
 
 	/**

@@ -92,6 +92,12 @@ Why this option over the alternatives.
 | DEC-023 | F3 panel drawn inside the station screen via mixin (no separate Screen) | RESOLVED | 2026-08-15 |
 | DEC-024 | F3 applicability guard source: VaultGearTierConfig groups per scope | RESOLVED | 2026-08-15 |
 | DEC-025 | F3 engine press semantics, stop reasons & 1.18.2 API facts | RESOLVED | 2026-08-15 |
+| DEC-026 | F3 panel drawing/input routing via framework element + title/row math | RESOLVED | 2026-08-15 |
+| DEC-027 | Runtime testing = user-tests built jar in Prism instance | RESOLVED | 2026-08-15 |
+| DEC-028 | F3 GUI revamp: dropdowns, human names, toggles, layout engine | RESOLVED | 2026-08-15 |
+| DEC-029 | Typed tier-config parsing, ability names, threshold retention, spacing | RESOLVED | 2026-08-15 |
+| DEC-030 | Effect-avoidance chance ranges, name fixes, status wording, reset counter | RESOLVED | 2026-08-15 |
+| DEC-031 | Multi-target watch list: per-target mins, stop condition, picker UX | RESOLVED | 2026-08-15 |
 
 ---
 
@@ -1486,3 +1492,125 @@ full list" behaviour and human-readable modifiers.
 - Panel minimum height grows from 122 to 116+dropdown (base 116), width 150 -> 200;
   anchored left of the window with right-side fallback, clamped so the full height
   (dropdown included) fits on screen.
+
+---
+
+### DEC-030 - Effect-avoidance ranges, name fixes, status wording, reset counter (owner request)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+Owner review of the panel after DEC-029: (a) the status line "Ready · min 3" was
+confusing ("what is it? why is it needed?") and its `·` glyph renders as garbage in
+Minecraft's font; (b) "Mod Effect Avoidance" should read "Effect Avoidance" and shows
+no min-max roll band; (c) the `-`/`+` step buttons had no background and uncentered
+glyphs; (d) when auto-reset-potential is on, the panel should count and show the
+resets during a run.
+
+**Root causes (verified against pack configs + jar)**
+
+1. The armor avoidance mods (`the_vault:mod_effect_avoidance` on chest/legs/helm/boots,
+   `crafted_effect_avoidance`, `u_effect_avoidance`) are **list-type**
+   `the_vault:effect_list_avoidance` (effect list + one shared chance); drink/unique and
+   the idol suffixes use single-effect `the_vault:effect_avoidance`. Both Config classes
+   (`EffectAvoidanceGearAttribute$Config` / `EffectAvoidanceListGearAttribute$Config`)
+   have **no public getters**; the numeric band is only reachable as the *value type*:
+   both generators' `getMinimumValue/getMaximumValue` return the attribute itself, and
+   both implement `IEffectAvoidanceChanceAttribute.getChance()` (fraction).
+2. Neither avoidance reader overrides `getModifierName()`, so names fell back to the
+   humanized raw id path "Mod Effect Avoidance".
+3. Tiers store `minChance/maxChance/step` as fractions (0.1 = 10%).
+
+**Decision**
+
+1. **Chance band:** `ModifierCatalog.rangeValue` handles
+   `IEffectAvoidanceChanceAttribute` min/max results -> `RangeValue(chance*100, chance*100,
+   step 1, percent=true)`, so the dropdown/range row shows "10% - 80%" on chestplate
+   (tiers 0.1/0.31/0.61/0.8). `toDisplayUnits` maps any
+   `IEffectAvoidanceChanceAttribute` value to `getChance()*100`, so "at least X" compares
+   the rolled chance in percent units like every other percentage attribute.
+2. **Name:** the `displayName` fallback strips a leading `mod_` id prefix before
+   humanizing (helper public as `stripModPrefix`) -> "Effect Avoidance" (idol suffixes:
+   "... Poison" etc; `crafted_`/`u_` stay as-is).
+3. **Status line:** ASCII wording - `Ready : goal at least 3` (or `...3%` for percent
+   targets), `Ready : any roll`, `Ready : N targets`, `Add a target modifier`; the
+   `Stopped: ...` roll-count separator changes `·` -> `-`.
+4. **Step buttons:** the `-`/`+` hit zones now draw a real button rect (12x10, inset 2)
+   with the game's button background (`0xFF303030`, `HOVER_COLOR` on hover, dimmed when
+   the config is off) and the glyph centered via `drawCentered`.
+5. **Reset counter:** `AutoRerollEngine` gains `potentialResetsThisSession` (incremented
+   in `handleOutOfPotential`, reset per run) + accessor; a new last panel row
+   (`counterY`) prints `Potential reset x N` while rolling with
+   `isAutoResetPotentialEnabled()`.
+
+**Rationale**
+The chance band is semantically the rollable value for both avoidance types and matches
+the per-roll behaviour (the game rolls one shared chance per modifier); reading it
+through the generator API keeps DEC-029's "typed configs only" rule while the Config
+classes hide their fields.
+
+**Impact**
+
+- Files: `ModifierCatalog`, `RerollPanel`, `RerollPanelLayout`, `AutoRerollEngine`.
+- Panel gains one optional bottom row (only during a run with reset enabled).
+- `VaultGearModifierReader.getModifierName()` stays the primary name source; the
+  `mod_` prefix strip only affects the fallback path.
+
+---
+
+### DEC-031 - Multi-target watch list, per-target mins, stop condition, picker UX (owner request)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+Owner request: the panel only watched one modifier; it must support adding several and
+stop auto-rerolling once *at least one* of them rolls. Owner confirmed the stop mode
+should itself be user-selectable ("whether all targets should pass or any target should
+pass and by default it should be set as any"), thresholds per target, and an explicit
+targets row + add-picker editor instead of a single toggle.
+
+**Decision**
+
+1. **Model:** `ModifierCatalog.RollTarget(id, thresholdEnabled, thresholdValue)`; the
+   panel holds `List<RollTarget>` + `focusedTarget` index; the Min row/Mode/range hint
+   edit the focused target (per-target thresholds, each clamped to its own band).
+2. **Stop condition:** `AutoRerollEngine.StopCondition { ANY, ALL }`, default ANY,
+   selected via a clickable chip on the Targets row (`any`/`all`, cycles, 24px hit
+   zone). ANY = first passing target stops; ALL = every watched target must have rolled
+   and passed at least once in the run (per-run `allPassed[]`, OR-marked per gear
+   change - a later lower roll never un-marks).
+3. **Engine contract:** `start(operation, List<RollTarget>, StopCondition)` replaces the
+   single-target overloads; `INVALID_TARGET` fires only when *no* watched target is
+   applicable to the operation scope; `targetRolled` scans scope affixes and matches per
+   modifier id (any out-of-scope target simply can never roll). `targetId()` now returns
+   the first target (compat). `/vma reroll start` logs the target count.
+4. **Editor UX:** a new "Targets" row (between Modifier and Min) shows the focused
+   target's name + `n` count and the condition chip; its dropdown lists the watch list
+   with per-entry `min X` / `any`, a `>` focus marker, and a 16px `x` remove zone.
+   The Modifier row becomes an add-picker placeholder ("add a modifier..." /
+   "+ add modifier"); dropdown items carry a `*` marker when already watched and click
+   toggles add/remove (add appends untargeted with no min and focuses it). Removing the
+   focused target shifts focus to a neighbour; empty list disables Start ("Add a target
+   modifier" status). Targets persist across operation switches (out-of-scope ones never
+   roll, shown with "Range: ?").
+5. **Layout:** rows grow by one (Targets) and one optional bottom row (reset counter,
+   DEC-030); all downstream Ys recomputed in `RerollPanelLayout` (`targetsY`,
+   `counterY`); new hit types `TARGETS_ROW`/`TARGETS_CHIP` and a
+   `DropdownMode.TARGETS` overlay.
+
+**Rationale**
+Keeps the proven single-editor Min row (per-target focused), reuses the existing
+dropdown/popover machinery for the watch list, and pins the "at least one" semantics
+the owner asked for with an explicit default.
+
+**Impact**
+
+- Files: `ModifierCatalog`, `AutoRerollEngine`, `RerollPanel`, `RerollPanelLayout`,
+  `VmaClientCommands`, `README.md`, `F3_AUTO_REROLL_PLAN.md`.
+- `/vma reroll start` uses the updated `RerollSelection(operationId, targets,
+  stopCondition)`; engine public API changed (list-based start).
+- Base panel height grows by one row (~178 px), width stays 216.
