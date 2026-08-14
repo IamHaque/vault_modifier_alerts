@@ -1,5 +1,6 @@
 package io.haque.vault_modifier_alerts.event;
 
+import io.haque.vault_modifier_alerts.VaultModifierAlerts;
 import io.haque.vault_modifier_alerts.VmaReference;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.downed.DownedAlertEngine;
@@ -11,6 +12,7 @@ import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.core.vault.ClientVaults;
 import iskallia.vault.core.vault.Vault;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -37,7 +39,15 @@ public final class ClientTickEvents {
 		AutoRerollEngine.getInstance().evaluate();
 		while (KeyBindings.TOGGLE_REROLL_PANEL.consumeClick()) {
 			if (minecraft.screen instanceof VaultArtisanStationScreen) {
-				RerollPanel.getInstance().toggleVisible();
+				RerollPanel panel = RerollPanel.getInstance();
+				panel.toggleVisible();
+				if (VmaClientConfigs.isDebugLogging()) {
+					VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll panel {}",
+							panel.isVisible() ? "shown" : "hidden");
+				}
+			} else {
+				minecraft.player.displayClientMessage(new TextComponent(
+						"[VMA] Open the Artisan Station to toggle the auto-reroll panel"), false);
 			}
 		}
 		if (!VmaClientConfigs.isExpiryAlertsEnabled()) {
