@@ -41,7 +41,10 @@ public final class AutoRerollEngine {
 	private boolean resetUsedThisSession;
 	private ResourceLocation operationId;
 	private ResourceLocation targetId;
+	private boolean thresholdEnabled;
+	private double thresholdValue;
 	private ItemStack lastPressedGear;
+	private VaultArtisanStationContainer.Tab lastSelectedTab;
 	private long lastPressTick;
 	private int rolls;
 	private StopReason stopReason;
@@ -54,19 +57,28 @@ public final class AutoRerollEngine {
 	}
 
 	public void start(ResourceLocation operation, ResourceLocation target) {
+		start(operation, target, false, 0.0);
+	}
+
+	public void start(ResourceLocation operation, ResourceLocation target, boolean thresholdEnabled,
+			double thresholdValue) {
 		if (operation == null || target == null || !VmaClientConfigs.isAutoRerollEnabled()) {
 			return;
 		}
 		operationId = operation;
 		targetId = target;
+		this.thresholdEnabled = thresholdEnabled;
+		this.thresholdValue = thresholdValue;
 		running = true;
 		inFlight = false;
 		resetUsedThisSession = false;
 		lastPressedGear = null;
+		lastSelectedTab = null;
 		lastPressTick = 0;
 		rolls = 0;
 		stopReason = null;
-		VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll started: operation={}, target={}", operation, target);
+		VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll started: operation={}, target={}, thresholdEnabled={},"
+				+ " thresholdValue={}", operation, target, thresholdEnabled, thresholdValue);
 	}
 
 	public void stop(StopReason reason, boolean playSound) {
@@ -188,6 +200,11 @@ public final class AutoRerollEngine {
 	private void press(VaultArtisanStationScreen station, GearModificationAction action, ItemStack gear) {
 		Minecraft mc = Minecraft.getInstance();
 		if (station instanceof ArtisanStationScreenAccessor accessor) {
+			VaultArtisanStationContainer.Tab tab = action.tab();
+			if (!tab.equals(lastSelectedTab)) {
+				station.selectTab(tab);
+				lastSelectedTab = tab;
+			}
 			lastPressedGear = gear.copy();
 			lastPressTick = mc.player.tickCount;
 			rolls++;
@@ -247,7 +264,16 @@ public final class AutoRerollEngine {
 		VaultGearData data = VaultGearData.read(gear);
 		for (AffixType affixType : scopeAffixes(ModifierCatalog.scopeOfOperation(operationId))) {
 			for (VaultGearModifier<?> modifier : data.getModifiers(affixType)) {
-				if (targetId.equals(modifier.getModifierIdentifier())) {
+				if (!targetId.equals(modifier.getModifierIdentifier())) {
+					continue;
+				}
+				if (!thresholdEnabled) {
+					return true;
+				}
+				double displayValue = ModifierCatalog.toDisplayUnits(modifier);
+				VaultModifierAlerts.LOGGER.debug("[VMA] Rolled target value={}, threshold={}", displayValue,
+						thresholdValue);
+				if (displayValue >= thresholdValue) {
 					return true;
 				}
 			}

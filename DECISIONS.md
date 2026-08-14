@@ -1219,3 +1219,131 @@ would see.
 ---
 
 ---
+
+### DEC-026 - Auto-reroll panel as a VH framework element + min-value threshold
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The F3 panel was previously drawn/clicked directly from the artisan screen mixin using raw
+rect math. The Remastered VH 3.15 screen framework draws everything through elements, so
+the panel was refactored into a real framework element added from the screen constructor
+(`addElement(RerollPanelElement.create(screen))` in `<init>` RETURN, exactly like reference
+mods), rendering and click-routing through the framework pipeline.
+
+**Decision**
+Two classes, split model/rendering:
+
+1. `RerollPanelElement` (thin, `io.haque.vault_modifier_alerts.feature.reroll`) -
+   `AbstractSpatialElement` + `IRenderedElement` + `IGuiEventElement`; positioning in
+   `layout((screenSize, gui, parent, world) -> world.positionXY(x, y))` anchored left of
+   the station window with right-side fallback (`MARGIN = 22`); `render`/`onMouseClicked`
+   delegate to the model. Panel size constants live in `RerollPanel` (single source of
+   truth, 150x122).
+2. `RerollPanel` (model + raw draw/hit code) - selection state (operationIndex,
+   targetIndex), min-value threshold state (minInputText draft, thresholdEnabled,
+   thresholdValue), `draw(...)`, `hitTest(...)`, `handleClick(...)`, and the keyboard
+   feed `acceptChar(char)` / `inputKey(int)` / `isMinInputFocused()`.
+
+Min-value threshold rules:
+
+- Draft accepts digits and at most one `.` (max 6 chars); empty draft = "any" (no
+  threshold). Commit on Enter, KP-Enter, Escape, or focus loss (`commitMinInput()`).
+- Commit strips a trailing `.`, parses, and clamps to the target's reachable
+  `RollRange` (min/max in display units; percent ranges are stored as fractions and
+  converted x100 in `ModifierCatalog.rollRange`); the draft is normalised with
+  `formatDisplay(value, false)` (no `%` in the draft - the suffix is only added when
+  drawing the committed value).
+- The `<`/`>` arrows on the Min row step by `RollRange.step()` (clamped); the field is
+  only rendered/clickable when the target range is numeric.
+- Because the framework does not route typed chars to elements owned by a `Screen`
+  (only click/render/update), `ClientTickEvents` feeds the field through
+  `ScreenEvent.KeyboardKeyPressedEvent.Pre` (`inputKey`) and
+  `ScreenEvent.KeyboardCharTypedEvent.Pre` (`acceptChar`), both cancelling the event
+  when consumed. `isMinInputFocused()` gates the P-key toggle so typing never toggles
+  the panel. Escape while focused is consumed (does not close the screen).
+
+**Verified framework API facts (reference for future widget work)**
+
+- `AbstractSpatialElement` exposes `public final int x()/y()/width()/height()`.
+- Element `layout` takes a 4-arg lambda `(ISpatial screenSize, ISpatial gui, ISpatial
+  parent, ISpatial world)`; `gui.left()/right()/top()` describe the window rect.
+- Widget surface verified by javap (not yet used - raw draw kept for now):
+  `DropdownElement(ISpatial, List<String>, Consumer<String>)`;
+  `NineSliceTextInputElement(ISpatial, NineSlice$TextureRegion, Font)` +
+  `setPadding/setMaxLength/setUsePlaceholder/setPlaceholderText/onTextChanged/
+  onEnterPressed/setText/getText/setFocused/isFocused` + `protected isValidChar(char)`;
+  `NineSliceButtonElement(ISpatial, NineSliceButtonTextures, Runnable)` +
+  `label(Supplier<Component>, LabelTextStyle$Builder)` + `setDisabled/setVisible(
+  Supplier<Boolean>)`; `LabelElement(pos, component, style)` / `(pos, size, component,
+  style)` + `set(Component)/setSupplier(...)`; `ScreenTextures` has
+  `INSET_BLACK_BACKGROUND`, `BUTTON_EMPTY_TEXTURES`,
+  `BUTTON_EMPTY_DARK_GRAY_TEXTURES`, `BUTTON_EMPTY_GREEN_TEXTURES`.
+
+**Rationale**
+The framework pipeline now owns render ordering, click routing, and z-order; the model
+class keeps all state and validation testable without the UI. Threshold guards reuse the
+same `ModifierCatalog.rollRange` data the game's own roll uses (see DEC-022), so "never
+exceed the target's max roll" holds by construction.
+
+**Alternatives considered**
+
+1. Full widget tree (DropdownElement + NineSliceTextInputElement) - rejected for now:
+   the raw-draw port was the minimal safe refactor; the widget surface above is verified
+   and documented for a future pass.
+2. Keep mixin-driven drawing - rejected: fights the framework element pipeline.
+
+**Impact**
+
+- Plan: 3 (panel anchor), 4.4 (threshold)
+- Stories: F3 (panel, threshold)
+- Caveat: in-game smoke test of the new element panel (rendering, min-field focus, step
+  arrows, P-key behaviour) has NOT been run yet - install
+  `build/libs/vault_modifier_alerts-<mod_version>.jar` (see DEC-027) into the Prism
+  instance first.
+
+---
+
+---
+
+### DEC-027 - Build & install workflow for the VH instance (session reference)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Toolchain
+
+**Context**
+The mod is developed against the Remastered VH pack installed via Prism Launcher, and
+every session needs the same toolchain facts.
+
+**Decision**
+
+- VH jar to inspect: `the_vault-1.18.2-20.0.3-remastered.6872.jar` inside the instance's
+  `minecraft/mods/` folder (no decompile needed). VH classes are NOT obfuscated, so
+  mixins use `remap = false` and real method names.
+- Signature verification without decompiling:
+  `javap -p -classpath <vault-jar-path> 'iskallia.vault.client.gui.framework.element.spi.<Class>'`
+  (also works for `element.<Class>`, `screen.block.<Class>`, etc.).
+- Build: `gradlew build` (Java 17); artifact lands at
+  `build/libs/vault_modifier_alerts-<mod_version>.jar` (`mod_version` in
+  `gradle.properties`, currently 0.2.4). Compile-only fast check: `gradlew compileJava`.
+- Install: copy the built jar over the same-named jar in the instance's `minecraft/mods/`
+  folder (or remove the old version first), then launch via Prism. Do not reference
+  absolute instance paths in committed files.
+- The repo keeps four tracking docs current: `RULES.md` (process),
+  `MODIFIER_ALERTS_SPEC.md` (what to build), `F3_AUTO_REROLL_PLAN.md` (auto-reroll
+  stories), `DECISIONS.md` (why - this file).
+
+**Rationale**
+Fast, reliable iteration loop without decompiler tooling; documented once so future
+sessions do not rediscover the jar location or command shape.
+
+**Impact**
+
+- All future sessions: read this entry before touching VH internals.
+
+---
+
+---

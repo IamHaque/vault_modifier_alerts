@@ -37,13 +37,35 @@ public final class ClientTickEvents {
 		if (!(event.getScreen() instanceof VaultArtisanStationScreen)) {
 			return;
 		}
+		RerollPanel panel = RerollPanel.getInstance();
+		if (panel.isMinInputFocused()) {
+			if (panel.inputKey(event.getKeyCode())) {
+				event.setCanceled(true);
+			}
+			return;
+		}
 		if (!KeyBindings.TOGGLE_REROLL_PANEL.matches(event.getKeyCode(), event.getScanCode())) {
 			return;
 		}
-		RerollPanel panel = RerollPanel.getInstance();
 		panel.toggleVisible();
 		if (VmaClientConfigs.isDebugLogging()) {
 			VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll panel {}", panel.isVisible() ? "shown" : "hidden");
+		}
+	}
+
+	/**
+	 * Typed-character support for the min-value field of the auto-reroll panel.
+	 * The framework does not route chars to elements we own, so this screen-level
+	 * event feeds the panel's own input state (with its strict range guards).
+	 */
+	@SubscribeEvent
+	public static void onScreenCharTyped(ScreenEvent.KeyboardCharTypedEvent.Pre event) {
+		if (!(event.getScreen() instanceof VaultArtisanStationScreen)) {
+			return;
+		}
+		RerollPanel panel = RerollPanel.getInstance();
+		if (panel.isMinInputFocused() && panel.acceptChar((char) event.getCodePoint())) {
+			event.setCanceled(true);
 		}
 	}
 
@@ -61,10 +83,12 @@ public final class ClientTickEvents {
 		while (KeyBindings.TOGGLE_REROLL_PANEL.consumeClick()) {
 			if (minecraft.screen instanceof VaultArtisanStationScreen) {
 				RerollPanel panel = RerollPanel.getInstance();
-				panel.toggleVisible();
-				if (VmaClientConfigs.isDebugLogging()) {
-					VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll panel {}",
-							panel.isVisible() ? "shown" : "hidden");
+				if (!panel.isMinInputFocused()) {
+					panel.toggleVisible();
+					if (VmaClientConfigs.isDebugLogging()) {
+						VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll panel {}",
+								panel.isVisible() ? "shown" : "hidden");
+					}
 				}
 			} else {
 				minecraft.player.displayClientMessage(new TextComponent(

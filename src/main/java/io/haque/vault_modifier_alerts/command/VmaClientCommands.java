@@ -64,7 +64,8 @@ public final class VmaClientCommands {
 			source.sendFailure(new TextComponent("[VMA] Auto-reroll is already running"));
 			return 0;
 		}
-		engine.start(selection.operationId(), selection.targetId());
+		engine.start(selection.operationId(), selection.targetId(), selection.thresholdEnabled(),
+				selection.thresholdValue());
 		source.sendSuccess(new TextComponent("[VMA] Auto-reroll started: " + selection.operationId() + " -> "
 				+ selection.targetId()), false);
 		return Command.SINGLE_SUCCESS;
