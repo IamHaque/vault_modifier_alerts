@@ -3,10 +3,9 @@ package io.haque.vault_modifier_alerts.mixin.artisan;
 import io.haque.vault_modifier_alerts.VaultModifierAlerts;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
-import io.haque.vault_modifier_alerts.mixin.artisan.ArtisanStationScreenAccessor;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.gear.modification.GearModificationAction;
-import net.minecraft.client.gui.screens.Screen;
+import com.mojang.blaze3d.vertex.PoseStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -44,7 +43,7 @@ public abstract class MixinVaultArtisanStationScreen implements ArtisanStationSc
 	}
 
 	@Inject(method = "m_6305_", at = @At("TAIL"))
-	private void vma$renderPanel(com.mojang.blaze3d.vertex.PoseStack poseStack, int mouseX, int mouseY, float partialTick,
+	private void vma$renderPanel(PoseStack poseStack, int mouseX, int mouseY, float partialTick,
 			CallbackInfo ci) {
 		try {
 			RerollPanel.getInstance().render((VaultArtisanStationScreen) (Object) this, poseStack, mouseX, mouseY);
