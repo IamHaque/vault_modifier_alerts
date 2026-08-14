@@ -6,7 +6,8 @@
   "client": [
     "tracker.MixinVaultModifier",
     "tracker.MixinModifiers",
-    "render.MixinModifiersRenderer"
+    "render.MixinModifiersRenderer",
+    "artisan.MixinVaultArtisanStationScreen"
   ],
   "minVersion": "0.8"
 }
