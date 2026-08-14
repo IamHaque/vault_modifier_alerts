@@ -7,6 +7,7 @@ import io.haque.vault_modifier_alerts.feature.downed.DownedAlertEngine;
 import io.haque.vault_modifier_alerts.feature.expiry.ExpiryAlertEngine;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
+import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout;
 import io.haque.vault_modifier_alerts.tracker.ModifierTracker;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.core.vault.ClientVaults;
@@ -31,6 +32,9 @@ public final class ClientTickEvents {
 	 * Vanilla only routes KeyMapping clicks while no screen is open, so the panel
 	 * toggle key would never fire inside the station GUI. ScreenEvent fires for
 	 * every key press a screen receives, so the toggle is matched here instead.
+	 * An open panel dropdown or focused min-value field gets the key first
+	 * (Escape closes the dropdown, arrows scroll it, editing keys commit the
+	 * field).
 	 */
 	@SubscribeEvent
 	public static void onScreenKeyPressed(ScreenEvent.KeyboardKeyPressedEvent.Pre event) {
@@ -38,10 +42,8 @@ public final class ClientTickEvents {
 			return;
 		}
 		RerollPanel panel = RerollPanel.getInstance();
-		if (panel.isMinInputFocused()) {
-			if (panel.inputKey(event.getKeyCode())) {
-				event.setCanceled(true);
-			}
+		if (panel.onKeyPressed(event.getKeyCode())) {
+			event.setCanceled(true);
 			return;
 		}
 		if (!KeyBindings.TOGGLE_REROLL_PANEL.matches(event.getKeyCode(), event.getScanCode())) {
@@ -65,6 +67,50 @@ public final class ClientTickEvents {
 		}
 		RerollPanel panel = RerollPanel.getInstance();
 		if (panel.isMinInputFocused() && panel.acceptChar((char) event.getCodePoint())) {
+			event.setCanceled(true);
+		}
+	}
+
+	/**
+	 * Clicking anywhere outside the panel while a dropdown is open closes the
+	 * dropdown without consuming the click (the station GUI stays interactive).
+	 */
+	@SubscribeEvent
+	public static void onScreenMouseClicked(ScreenEvent.MouseClickedEvent.Pre event) {
+		if (!(event.getScreen() instanceof VaultArtisanStationScreen)) {
+			return;
+		}
+		RerollPanel panel = RerollPanel.getInstance();
+		if (!panel.isDropdownOpen()) {
+			return;
+		}
+		RerollPanelLayout.Rect bounds = panel.bounds();
+		if (bounds == null || event.getMouseX() < bounds.x() || event.getMouseX() >= bounds.x() + bounds.width()
+				|| event.getMouseY() < bounds.y() || event.getMouseY() >= bounds.y() + bounds.height()) {
+			panel.closeDropdown();
+		}
+	}
+
+	/**
+	 * Mouse-wheel scrolling for an open dropdown. Handled at screen level (the
+	 * same proven path as keys/chars/mouse-clicks) so it fires exactly once even
+	 * if the framework also dispatches wheel events to its own elements.
+	 */
+	@SubscribeEvent
+	public static void onScreenMouseScrolled(ScreenEvent.MouseScrollEvent.Pre event) {
+		if (!(event.getScreen() instanceof VaultArtisanStationScreen)) {
+			return;
+		}
+		RerollPanel panel = RerollPanel.getInstance();
+		if (!panel.isDropdownOpen()) {
+			return;
+		}
+		RerollPanelLayout.Rect bounds = panel.bounds();
+		if (bounds == null || event.getMouseX() < bounds.x() || event.getMouseX() >= bounds.x() + bounds.width()
+				|| event.getMouseY() < bounds.y() || event.getMouseY() >= bounds.y() + bounds.height()) {
+			return;
+		}
+		if (panel.handleScroll(event.getScrollDelta())) {
 			event.setCanceled(true);
 		}
 	}

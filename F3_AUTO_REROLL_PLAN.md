@@ -200,6 +200,13 @@ protection). Closing the screen stops the run.
 
 ### 4.4 Panel (`RerollPanel`)
 
+> **[see DEC-028] — superseded by the GUI revamp.** Compact side panel
+> (150×110) with `‹ ›` cycling selectors and raw row-math hit-testing was replaced
+> by a 200px-wide panel with click-to-open dropdown selectors, an Auto-reroll
+> on/off toggle, a min-threshold range hint, a colored potential line with a
+> rolls-left estimate, and a richer rolling/stop status line. All geometry now
+> comes from `RerollPanelLayout` (single source of truth for drawing and input).
+
 Compact side panel (≈150×110 px, scale-safe), drawn with vanilla gui drawing calls
 (fill + `drawString`), containing:
 

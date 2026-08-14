@@ -1347,3 +1347,77 @@ sessions do not rediscover the jar location or command shape.
 ---
 
 ---
+
+### DEC-028 - F3 reroll GUI revamp: dropdown selectors, GUI toggle, layout engine (owner request)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The owner reviewed the shipped F3 panel and asked for a GUI revamp, referencing
+`massuus/vault-party-ui` as a visual/UX reference (dark panels, gold `0xFFE3C38C` accents,
+popup/button-list selectors). Complaints: (a) `‹ ›` arrow cycling for operation/target is
+too basic - click should open a full picker; (b) modifier names were code-like in some
+fallback paths (raw id path) instead of human text; (c) no on/off auto-reroll toggle in
+the GUI; (d) status/potential info too thin; (e) hand-maintained draw-vs-click row math
+in `RerollPanel` is brittle. The previous panel also truncated names to 16 chars and the
+whole GUI was deleted-and-rewritten as instructed, keeping the engine's behaviour.
+
+**Decision**
+
+1. **Selector UX:** Focus and Modifier rows open an **in-panel dropdown** (the framework
+   element's rect grows via `setHeight` + `requestLayout` when a dropdown is open) listing
+   every option; Escape / arrows / wheel scroll it, clicks outside close it. A separate
+   popup `Screen` (vault-party-ui `DifficultySelectionScreen` style) was rejected: the
+   engine stops a run with `SCREEN_CLOSED` whenever `mc.screen` is not the station screen,
+   so any popup screen would kill a running roll on open.
+2. **Input routing:** mouse clicks stay on the framework element (proven path);
+   keyboard (Escape/Up/Down for dropdown, editing keys for the min field), mouse-wheel
+   scroll and click-outside-to-close are handled by screen-level Forge events in
+   `ClientTickEvents` (the same proven path as the existing key/char routing). Wheel and
+   mouse events are consumed/cancelled exactly once; the element does NOT override
+   `onMouseScrolled` to avoid double-handling.
+3. **Human names:** `ModifierCatalog` gains `humanizeId(path)` (snake/kebab -> title
+   case) as the guaranteed fallback; primary display stays the game's own
+   `VaultGearModifierReader.getModifierName()`. New `RollRange.displayText()` renders the
+   rollable band ("2.0 - 6.0%") in the dropdown and the Min range row.
+4. **GUI toggle:** new "Auto-reroll" checkbox flips config `enabled`
+   (`VmaClientConfigs.setAutoRerollEnabled`). The panel no longer hides itself when the
+   config is off (`RerollPanelElement.isVisible()` now only checks `panel.visible`), so
+   the toggle stays reachable from the station; controls are dimmed and the engine keeps
+   its existing off-switch stop.
+5. **Status/potential:** potential row is colored (red at 0) and shows "~N rolls" from
+   `ModConfigs.VAULT_GEAR_MODIFICATION_CONFIG.getPotentialUsed(...)`; status line shows
+   rolls, the last rolled target value (`AutoRerollEngine.lastTargetValue`, recorded in
+   `targetRolled` for every roll), and the existing stop-reason text.
+6. **Layout engine:** new `RerollPanelLayout` computes every row/button/dropdown rect
+   once per frame; `draw` and `handleClick`/`handleScroll` both use `regionAt(...)`,
+   removing the parallel row-math entirely.
+7. **Min threshold:** kept (click-to-type, `-`/`+` step, clamps to the target's roll
+   range) and now self-heals: a threshold that no longer fits a newly selected
+   non-numeric modifier is cleared, and a range hint row shows the rollable band.
+
+**Rationale**
+Matches the reference UX while keeping the proven single-screen element architecture and
+the engine's stop-reason semantics untouched; gives the owner the requested "click for
+full list" behaviour and human-readable modifiers.
+
+**Alternatives considered**
+
+1. Popup `Screen` per vault-party-ui (`DifficultySelectionScreen`) - rejected: stops
+   running rolls (engine screen guard), adds screen-swap complexity.
+2. Rebuild with vanilla `Button`s in a bigger panel - rejected: framework elements are
+   the codebase's proven pattern for this screen.
+3. Keep `‹ ›` cycling with a longer value field - rejected: no full-list visibility,
+   the exact pain point reported.
+
+**Impact**
+
+- Files: `RerollPanel`, `RerollPanelElement`, `RerollPanelLayout` (new),
+  `ModifierCatalog`, `AutoRerollEngine`, `VmaClientConfigs`, `ClientTickEvents`,
+  `README.md`, `F3_AUTO_REROLL_PLAN.md` (§4.4 marked superseded).
+- Engine state machine, stop reasons, sounds, `/vma reroll` contract: unchanged.
+- Panel minimum height grows from 122 to 116+dropdown (base 116), width 150 -> 200;
+  anchored left of the window with right-side fallback, clamped so the full height
+  (dropdown included) fits on screen.

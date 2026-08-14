@@ -45,6 +45,15 @@ public final class ModifierCatalog {
 	 * Not numeric when the modifier carries no numeric value.
 	 */
 	public record RollRange(double min, double max, double step, boolean numeric, boolean percent) {
+
+		/** Human text of the rollable band, e.g. "2.0 - 6.0" or "2.0 - 6.0%" (empty when not numeric). */
+		public String displayText() {
+			if (!numeric) {
+				return "";
+			}
+			String suffix = percent ? "%" : "";
+			return RerollPanel.formatDisplay(min, false) + " - " + RerollPanel.formatDisplay(max, false) + suffix;
+		}
 	}
 
 	private ModifierCatalog() {
@@ -220,13 +229,36 @@ public final class ModifierCatalog {
 	private static String displayName(ModifierTierGroup tierGroup) {
 		ResourceLocation attributeId = tierGroup.getAttribute();
 		if (attributeId == null) {
-			return tierGroup.getIdentifier().getPath();
+			return humanizeId(tierGroup.getIdentifier().getPath());
 		}
 		VaultGearAttribute<?> attribute = VaultGearAttributeRegistry.getAttribute(attributeId);
 		if (attribute == null || attribute.getReader() == null) {
-			return tierGroup.getIdentifier().getPath();
+			return humanizeId(tierGroup.getIdentifier().getPath());
 		}
 		String name = attribute.getReader().getModifierName();
-		return name == null || name.isBlank() ? tierGroup.getIdentifier().getPath() : name;
+		return name == null || name.isBlank() ? humanizeId(tierGroup.getIdentifier().getPath()) : name;
+	}
+
+	/**
+	 * Turns a raw modifier id path into readable text ("melee_attack_damage"
+	 * becomes "Melee Attack Damage"). Never returns the raw path unchanged.
+	 */
+	public static String humanizeId(String path) {
+		if (path == null || path.isEmpty()) {
+			return "?";
+		}
+		StringBuilder result = new StringBuilder();
+		boolean capitalize = true;
+		for (int i = 0; i < path.length(); i++) {
+			char c = path.charAt(i);
+			if (c == '_' || c == '-' || c == ' ') {
+				capitalize = true;
+				result.append(' ');
+				continue;
+			}
+			result.append(capitalize ? Character.toUpperCase(c) : c);
+			capitalize = false;
+		}
+		return result.toString().trim();
 	}
 }

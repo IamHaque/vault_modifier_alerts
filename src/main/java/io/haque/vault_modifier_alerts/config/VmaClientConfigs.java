@@ -143,6 +143,10 @@ public final class VmaClientConfigs {
 		return AUTO_REROLL_ENABLED.get();
 	}
 
+	public static void setAutoRerollEnabled(boolean value) {
+		AUTO_REROLL_ENABLED.set(value);
+	}
+
 	public static int autoRerollTickInterval() {
 		return AUTO_REROLL_TICK_INTERVAL.get();
 	}

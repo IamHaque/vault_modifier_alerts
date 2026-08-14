@@ -81,14 +81,23 @@ multiplayer. Toggles persist in `config/vault_modifier_alerts-client.toml`.
 At an Artisan Station, press **P** to toggle the Auto-Reroll side panel (drawn **outside**
 the station window — right side preferred, left fallback — so it never obstructs the GUI):
 
-- **Op** — the re-roll operation: reforge all (`reforge_all`), reforge prefix / suffix
-  (`reforge_affix_prefix`/`_suffix`), or reforge implicits (`reforge_implicits`).
-- **Tgt** — the target modifier that can actually roll under the selected operation for the
-  gear in the station (impossible targets, e.g. an attack-damage modifier on a helmet, are
-  not offered).
-- **Auto-reset** checkbox — when the selected operation is disabled for lack of crafting
-  potential, press `reset_potential` (Opportunistic Focus) once per run automatically
+- **Focus** — the re-roll operation: reforge all, reforge prefix / suffix, or reforge
+  implicits. Click the row to open a dropdown with the full list.
+- **Modifier** — the target modifier that can actually roll under the selected operation for
+  the gear in the station (impossible targets, e.g. an attack-damage modifier on a helmet, are
+  not offered). Click the row to open a scrollable dropdown with every available modifier,
+  shown with human-readable names and their rollable value ranges.
+- **Min** — an optional minimum threshold: keep rolling until the target rolls at least this
+  value (type it in, or step with the `-`/`+` buttons; the rollable range is shown below the
+  field). No threshold = stop on any roll of the target.
+- **Auto-reroll** toggle — master switch for the feature, right in the GUI (persists to the
+  `enabled` config; turning it off stops any running roll and dims the controls).
+- **Auto-reset potential** checkbox — when the selected operation is disabled for lack of
+  crafting potential, press `reset_potential` (Opportunistic Focus) once per run automatically
   (config `autoResetPotential`, default `true`).
+- **Potential** line — current/max crafting potential plus an estimate of the rolls left.
+- **Status** line — roll counter, the last rolled value of the target, and the stop reason
+  (e.g. `Rolling... #7 (4.2%)`, `Stopped: target rolled · 12 rolls`).
 
 Start / Stop with the panel button or `/vma reroll start|stop` (the command uses the panel's
 current selection). The engine presses the station's own buttons through the same code path

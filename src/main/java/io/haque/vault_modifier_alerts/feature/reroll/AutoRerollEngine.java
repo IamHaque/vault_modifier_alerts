@@ -48,6 +48,7 @@ public final class AutoRerollEngine {
 	private long lastPressTick;
 	private int rolls;
 	private StopReason stopReason;
+	private double lastTargetValue;
 
 	private AutoRerollEngine() {
 	}
@@ -77,6 +78,7 @@ public final class AutoRerollEngine {
 		lastPressTick = 0;
 		rolls = 0;
 		stopReason = null;
+		lastTargetValue = 0.0;
 		VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll started: operation={}, target={}, thresholdEnabled={},"
 				+ " thresholdValue={}", operation, target, thresholdEnabled, thresholdValue);
 	}
@@ -197,6 +199,11 @@ public final class AutoRerollEngine {
 		return stopReason;
 	}
 
+	/** The most recent roll value of the target modifier seen during the current run (0 before any roll). */
+	public double lastTargetValue() {
+		return lastTargetValue;
+	}
+
 	private void press(VaultArtisanStationScreen station, GearModificationAction action, ItemStack gear) {
 		Minecraft mc = Minecraft.getInstance();
 		if (station instanceof ArtisanStationScreenAccessor accessor) {
@@ -267,15 +274,11 @@ public final class AutoRerollEngine {
 				if (!targetId.equals(modifier.getModifierIdentifier())) {
 					continue;
 				}
-				if (!thresholdEnabled) {
-					return true;
-				}
 				double displayValue = ModifierCatalog.toDisplayUnits(modifier);
+				lastTargetValue = displayValue;
 				VaultModifierAlerts.LOGGER.debug("[VMA] Rolled target value={}, threshold={}", displayValue,
 						thresholdValue);
-				if (displayValue >= thresholdValue) {
-					return true;
-				}
+				return !thresholdEnabled || displayValue >= thresholdValue;
 			}
 		}
 		return false;
