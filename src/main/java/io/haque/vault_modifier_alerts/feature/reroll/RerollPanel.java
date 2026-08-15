@@ -341,7 +341,20 @@ public final class RerollPanel {
 
 	public boolean handleClick(VaultArtisanStationScreen screen, int x, int y, int width, int height, int mouseX,
 			int mouseY, int button) {
-		if (button != 0 || !hitTest(x, y, width, height, mouseX, mouseY)) {
+		if (!hitTest(x, y, width, height, mouseX, mouseY)) {
+			return false;
+		}
+		// Right-click on Min field clears the threshold (Phase 5.1)
+		if (button == 1) {
+			RerollPanelLayout layout = computeLayout(x, y);
+			Hit hit = layout.regionAt(mouseX, mouseY);
+			if (hit.type() == RerollPanelLayout.HitType.MIN_FIELD) {
+				state.clearFocusedThreshold();
+				return true;
+			}
+			return false;
+		}
+		if (button != 0) {
 			return false;
 		}
 		List<GearModificationAction> operations = operations(screen);

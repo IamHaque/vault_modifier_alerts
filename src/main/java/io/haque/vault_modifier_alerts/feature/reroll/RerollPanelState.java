@@ -424,6 +424,12 @@ public final class RerollPanelState {
 		this.stopCondition = condition;
 	}
 
+	/** Clears the focused target's threshold (right-click clear convention). */
+	public void clearFocusedThreshold() {
+		setFocusedThreshold(false, 0.0);
+		minInputText = "";
+	}
+
 	/** Package-private reset for the min-input text (used by clear-targets). */
 	void resetMinInputText() {
 		this.minInputText = "";
