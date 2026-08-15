@@ -50,12 +50,12 @@ public final class VmaClientConfigs {
 	public static final ForgeConfigSpec.BooleanValue REROLL_PANEL_ENABLED;
 	public static final ForgeConfigSpec.ConfigValue<String> REROLL_PANEL_SIDE;
 	public static final ForgeConfigSpec.BooleanValue REROLL_PANEL_COMPACT_MODE;
-	public static final ForgeConfigSpec.IntValue PANEL_BG_COLOR;
-	public static final ForgeConfigSpec.IntValue PANEL_BORDER_COLOR;
-	public static final ForgeConfigSpec.IntValue PANEL_TEXT_COLOR;
-	public static final ForgeConfigSpec.IntValue PANEL_ACCENT_GOLD_COLOR;
-	public static final ForgeConfigSpec.IntValue PANEL_SUCCESS_COLOR;
-	public static final ForgeConfigSpec.IntValue PANEL_DANGER_COLOR;
+	public static final ForgeConfigSpec.ConfigValue<Integer> PANEL_BG_COLOR;
+	public static final ForgeConfigSpec.ConfigValue<Integer> PANEL_BORDER_COLOR;
+	public static final ForgeConfigSpec.ConfigValue<Integer> PANEL_TEXT_COLOR;
+	public static final ForgeConfigSpec.ConfigValue<Integer> PANEL_ACCENT_GOLD_COLOR;
+	public static final ForgeConfigSpec.ConfigValue<Integer> PANEL_SUCCESS_COLOR;
+	public static final ForgeConfigSpec.ConfigValue<Integer> PANEL_DANGER_COLOR;
 
 	static {
 		ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -117,22 +117,22 @@ public final class VmaClientConfigs {
 				.define("compactMode", false);
 		PANEL_BG_COLOR = builder
 				.comment("Panel background color (ARGB hex).")
-				.defineInRange("panelBgColor", 0xEE111111, 0, 0xFFFFFFFF);
+				.define("panelBgColor", 0xEE111111);
 		PANEL_BORDER_COLOR = builder
 				.comment("Panel border color (ARGB hex).")
-				.defineInRange("panelBorderColor", 0xFF6B6B6B, 0, 0xFFFFFFFF);
+				.define("panelBorderColor", 0xFF6B6B6B);
 		PANEL_TEXT_COLOR = builder
 				.comment("Default text color (ARGB hex).")
-				.defineInRange("panelTextColor", 0xFFFFFFFF, 0, 0xFFFFFFFF);
+				.define("panelTextColor", 0xFFFFFFFF);
 		PANEL_ACCENT_GOLD_COLOR = builder
 				.comment("Gold accent color for headers and highlights (ARGB hex).")
-				.defineInRange("panelAccentGoldColor", 0xFFE3C38C, 0, 0xFFFFFFFF);
+				.define("panelAccentGoldColor", 0xFFE3C38C);
 		PANEL_SUCCESS_COLOR = builder
 				.comment("Success/ready state color (ARGB hex).")
-				.defineInRange("panelSuccessColor", 0xFF55FF55, 0, 0xFFFFFFFF);
+				.define("panelSuccessColor", 0xFF55FF55);
 		PANEL_DANGER_COLOR = builder
 				.comment("Danger/error state color (ARGB hex).")
-				.defineInRange("panelDangerColor", 0xFFFF5555, 0, 0xFFFFFFFF);
+				.define("panelDangerColor", 0xFFFF5555);
 		builder.pop();
 
 		SPEC = builder.build();
