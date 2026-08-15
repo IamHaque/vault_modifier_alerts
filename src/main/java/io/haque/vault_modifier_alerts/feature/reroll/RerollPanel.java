@@ -12,12 +12,13 @@ import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout.HitType;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout.Rect;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.container.VaultArtisanStationContainer;
+import iskallia.vault.gear.crafting.VaultGearCraftingHelper;
 import iskallia.vault.gear.modification.GearModificationAction;
-import iskallia.vault.init.ModConfigs;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
@@ -800,9 +801,9 @@ public final class RerollPanel {
 		ItemStack gear = stationGear();
 		int potential = ModifierCatalog.craftingPotential(gear);
 		int max = ModifierCatalog.maxCraftingPotential(gear);
-		int cost = potentialCost(operation);
+		int cost = potentialCost(gear, operation);
 		String left = "Potential " + potential + "/" + max;
-		String right = cost > 0 && potential > 0 ? "~" + Math.max(1, potential / cost) + " rolls" : "";
+		String right = cost > 0 && potential >= cost ? "~" + potential / cost + " rolls" : "";
 		int color = potential > 0 ? (VmaClientConfigs.isAutoRerollEnabled() ? TEXT_COLOR : DISABLED_COLOR) : WARN_COLOR;
 		drawString(poseStack, left, x + RerollPanelLayout.PAD_X, layout.potentialY + 3, color);
 		if (!right.isEmpty()) {
@@ -1006,7 +1007,7 @@ public final class RerollPanel {
 				range = rollRange.displayText();
 			}
 			if (operationDropdown && index < operations.size()) {
-				int cost = potentialCost(operations.get(index));
+				int cost = potentialCost(stationGear(), operations.get(index));
 				if (cost > 0) {
 					range = cost + " potential";
 				}
@@ -1176,13 +1177,16 @@ public final class RerollPanel {
 		return ItemStack.EMPTY;
 	}
 
-	private static int potentialCost(GearModificationAction operation) {
+	private static int potentialCost(ItemStack gear, GearModificationAction operation) {
 		try {
-			if (operation == null || operation.modification() == null
-					|| ModConfigs.VAULT_GEAR_MODIFICATION_CONFIG == null) {
+			if (gear == null || gear.isEmpty() || operation == null || operation.modification() == null) {
 				return 0;
 			}
-			return ModConfigs.VAULT_GEAR_MODIFICATION_CONFIG.getPotentialUsed(operation.modification());
+			Player player = Minecraft.getInstance().player;
+			if (player == null) {
+				return 0;
+			}
+			return VaultGearCraftingHelper.getReducedPotential(gear, player, operation.modification());
 		} catch (Exception ignored) {
 			return 0;
 		}
