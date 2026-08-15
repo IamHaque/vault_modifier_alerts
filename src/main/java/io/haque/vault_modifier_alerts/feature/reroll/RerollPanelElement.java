@@ -16,11 +16,12 @@ import net.minecraft.util.Mth;
  * {@link RerollPanelLayout#MIN_WIDTH} instead of overlapping at full width.
  *
  * The framework renders elements <em>before</em> slot items, so this element
- * does NOT draw itself - the mixin draws the panel at the TAIL of the screen
- * render, above slot items and tooltips. The element stays registered so the
- * framework keeps routing clicks to {@link RerollPanel#handleClick}, and its
- * height/width re-sync drives the framework layout pass. All model, rendering
- * and hit logic lives in {@link RerollPanel}.
+ * draws the panel itself (guaranteeing it is visible) and the mixin re-draws
+ * it at the TAIL of the screen render, above slot items and tooltips. The
+ * second pass paints the same pixels, so the double draw is invisible; it only
+ * matters when slot items overlap the panel. The element also re-syncs its
+ * height/width through the framework layout pass. All model, rendering and hit
+ * logic lives in {@link RerollPanel}.
  */
 public final class RerollPanelElement extends AbstractSpatialElement<RerollPanelElement>
 		implements IRenderedElement, IGuiEventElement {
@@ -80,6 +81,7 @@ public final class RerollPanelElement extends AbstractSpatialElement<RerollPanel
 		if (!panel.isVisible()) {
 			return;
 		}
+		panel.draw(screen, poseStack, x(), y(), width(), height(), mouseX, mouseY);
 		syncSize(panel);
 	}
 

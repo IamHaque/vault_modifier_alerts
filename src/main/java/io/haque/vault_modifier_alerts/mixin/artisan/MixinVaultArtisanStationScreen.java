@@ -1,6 +1,7 @@
 package io.haque.vault_modifier_alerts.mixin.artisan;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import io.haque.vault_modifier_alerts.VaultModifierAlerts;
 import io.haque.vault_modifier_alerts.feature.reroll.ArtisanStationScreenAccessor;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
@@ -26,8 +27,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * framework elements - so the auto-reroll panel is added as a real framework
  * element from the constructor, exactly like the reference mods do.
  * - <init> RETURN: registers RerollPanelElement (click-routed by the framework).
- * - m_6305_ TAIL: draws the panel after the framework rendered its elements and
- *   the slot items, so inventory/focus icons never paint over it.
+ * - m_6305_ TAIL (require=0): re-draws the panel on top of the slot items the
+ *   framework painted over it; best-effort only, the element pass still draws.
  * - attemptCraft HEAD: notifies the engine of any press (engine or manual).
  * - Duck interface ArtisanStationScreenAccessor exposes the private attemptCraft
  *   so the engine can trigger the exact button-press behaviour.
@@ -59,13 +60,23 @@ public abstract class MixinVaultArtisanStationScreen extends AbstractElementCont
 		addElement(RerollPanelElement.create((VaultArtisanStationScreen) (Object) this));
 	}
 
-	@Inject(method = "m_6305_", at = @At("TAIL"))
+	/**
+	 * Draws the panel again at the very end of the screen render, above the
+	 * slot items and tooltips the framework painted over it. require=0: the
+	 * element already draws the panel in the framework pass, so a failure here
+	 * only loses the z-order improvement, never the panel itself.
+	 */
+	@Inject(method = "m_6305_", at = @At("TAIL"), require = 0)
 	private void vma$renderPanelOnTop(PoseStack poseStack, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
-		RerollPanelElement element = RerollPanelElement.getInstance();
-		RerollPanel panel = RerollPanel.getInstance();
-		if (element != null && panel.isVisible()) {
-			panel.draw((VaultArtisanStationScreen) (Object) this, poseStack, element.x(), element.y(),
-					element.width(), element.height(), mouseX, mouseY);
+		try {
+			RerollPanelElement element = RerollPanelElement.getInstance();
+			RerollPanel panel = RerollPanel.getInstance();
+			if (element != null && panel.isVisible()) {
+				panel.draw((VaultArtisanStationScreen) (Object) this, poseStack, element.x(), element.y(),
+						element.width(), element.height(), mouseX, mouseY);
+			}
+		} catch (Throwable t) {
+			VaultModifierAlerts.LOGGER.warn("[VMA] Failed to re-draw auto-reroll panel on top", t);
 		}
 	}
 
