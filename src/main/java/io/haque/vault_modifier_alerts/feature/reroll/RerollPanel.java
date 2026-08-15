@@ -332,7 +332,6 @@ public final class RerollPanel {
 		drawMinRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawRangeRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawPotentialRow(poseStack, layout, x, width, operation);
-		drawCounterRow(poseStack, layout, engine);
 
 		if (state.isDropdownOpen()) {
 			drawDropdown(poseStack, layout, operations, candidates, mouseX, mouseY);
@@ -655,14 +654,6 @@ public final class RerollPanel {
 		return detail.toString();
 	}
 
-	private void drawCounterRow(PoseStack poseStack, RerollPanelLayout layout, AutoRerollEngine engine) {
-		if (!engine.isRunning() || !VmaClientConfigs.isAutoResetPotentialEnabled()) {
-			return;
-		}
-		int resets = engine.potentialResetsThisSession();
-		drawString(poseStack, "Potential reset x " + resets, layout.x + RerollPanelLayout.PAD_X, layout.counterY + 3,
-				RerollTokens.TEXT_MUTED);
-	}
 
 	private void drawDropdown(PoseStack poseStack, RerollPanelLayout layout, List<GearModificationAction> operations,
 			List<Candidate> candidates, int mouseX, int mouseY) {

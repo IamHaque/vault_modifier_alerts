@@ -2,6 +2,7 @@ package io.haque.vault_modifier_alerts.feature.reroll;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
+import io.haque.vault_modifier_alerts.feature.reroll.ui.CounterRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StartStopButtonElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StatusRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.ToggleRowElement;
@@ -134,6 +135,16 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 			world.width(parent.width());
 		});
 		instance.addElement(statusRow);
+
+		// Counter row (row 12)
+		int counterY = statusY + RerollPanelLayout.ROW_H;
+		CounterRowElement counterRow = new CounterRowElement(0, counterY, RerollPanelLayout.WIDTH);
+		counterRow.setFont(net.minecraft.client.Minecraft.getInstance().font);
+		counterRow.layout((screenSize, gui, parent, world) -> {
+			world.positionXY(0, counterY);
+			world.width(parent.width());
+		});
+		instance.addElement(counterRow);
 
 		return instance;
 	}
