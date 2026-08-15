@@ -14,5 +14,21 @@
         "name": "vault_modifier_alerts:vault/downed_alert"
       }
     ]
+  },
+  "reroll_success": {
+    "subtitle": "vault_modifier_alerts.subtitle.reroll_success",
+    "sounds": [
+      {
+        "name": "minecraft:block.note_block.pling"
+      }
+    ]
+  },
+  "reroll_stop": {
+    "subtitle": "vault_modifier_alerts.subtitle.reroll_stop",
+    "sounds": [
+      {
+        "name": "minecraft:block.note_block.pling"
+      }
+    ]
   }
 }

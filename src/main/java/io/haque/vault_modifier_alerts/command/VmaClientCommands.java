@@ -4,6 +4,10 @@ import com.mojang.brigadier.Command;
 import io.haque.vault_modifier_alerts.VmaReference;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.order.ModifierOrdering;
+import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
+import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine.StopReason;
+import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog;
+import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
 import io.haque.vault_modifier_alerts.tracker.ModifierTracker;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -32,6 +36,11 @@ public final class VmaClientCommands {
 				.then(Commands.literal("sound")
 						.then(Commands.literal("on").executes(ctx -> setSound(ctx.getSource(), true)))
 						.then(Commands.literal("off").executes(ctx -> setSound(ctx.getSource(), false))))
+				.then(Commands.literal("reroll")
+						.then(Commands.literal("enable").executes(ctx -> setRerollEnabled(ctx.getSource(), true)))
+						.then(Commands.literal("disable").executes(ctx -> setRerollEnabled(ctx.getSource(), false)))
+						.then(Commands.literal("start").executes(ctx -> rerollStart(ctx.getSource())))
+						.then(Commands.literal("stop").executes(ctx -> rerollStop(ctx.getSource()))))
 				.then(Commands.literal("status").executes(ctx -> status(ctx.getSource()))));
 	}
 
@@ -47,6 +56,63 @@ public final class VmaClientCommands {
 		return Command.SINGLE_SUCCESS;
 	}
 
+	private static int setRerollEnabled(CommandSourceStack source, boolean value) {
+		VmaClientConfigs.setAutoRerollEnabled(value);
+		if (!value) {
+			AutoRerollEngine.getInstance().cancelResume();
+			if (AutoRerollEngine.getInstance().isRunning()) {
+				AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
+			}
+		}
+		source.sendSuccess(new TextComponent("[VMA] Auto-reroll " + (value ? "enabled" : "disabled")), false);
+		return Command.SINGLE_SUCCESS;
+	}
+
+	private static int rerollStart(CommandSourceStack source) {
+		if (!VmaClientConfigs.isAutoRerollEnabled()) {
+			source.sendFailure(new TextComponent("[VMA] Auto-reroll is disabled (use /vma reroll enable)"));
+			return 0;
+		}
+		RerollPanel.RerollSelection selection = RerollPanel.getInstance().currentSelection();
+		if (selection == null) {
+			source.sendFailure(new TextComponent("[VMA] Open the Artisan Station and pick a target first"));
+			return 0;
+		}
+		AutoRerollEngine engine = AutoRerollEngine.getInstance();
+		if (engine.isRunning()) {
+			source.sendFailure(new TextComponent("[VMA] Auto-reroll is already running"));
+			return 0;
+		}
+		engine.start(selection.operationId(), selection.targets(), selection.stopCondition());
+		StringBuilder detail = new StringBuilder();
+		for (int i = 0; i < selection.targets().size(); i++) {
+			ModifierCatalog.RollTarget target = selection.targets().get(i);
+			if (i > 0) {
+				detail.append(", ");
+			}
+			detail.append(ModifierCatalog.humanizeId(ModifierCatalog.stripModPrefix(target.id().getPath())));
+			if (target.thresholdEnabled()) {
+				detail.append(" >=").append(RerollPanel.formatDisplay(target.thresholdValue(), false));
+			} else {
+				detail.append(" any");
+			}
+		}
+		source.sendSuccess(new TextComponent("[VMA] Auto-reroll started: " + selection.operationId() + " -> "
+				+ detail + (selection.stopCondition() == AutoRerollEngine.StopCondition.ALL ? " (all)" : "")), false);
+		return Command.SINGLE_SUCCESS;
+	}
+
+	private static int rerollStop(CommandSourceStack source) {
+		AutoRerollEngine engine = AutoRerollEngine.getInstance();
+		if (!engine.isRunning()) {
+			source.sendFailure(new TextComponent("[VMA] Auto-reroll is not running"));
+			return 0;
+		}
+		engine.stop(StopReason.STOPPED, false);
+		source.sendSuccess(new TextComponent("[VMA] Auto-reroll stopped"), false);
+		return Command.SINGLE_SUCCESS;
+	}
+
 	private static int status(CommandSourceStack source) {
 		ModifierTracker tracker = ModifierTracker.getInstance();
 		for (String line : statusLines(tracker)) {
@@ -59,6 +125,7 @@ public final class VmaClientCommands {
 		List<String> lines = new ArrayList<>();
 		lines.add("[VMA] debug: " + (VmaClientConfigs.isDebugLogging() ? "on" : "off")
 				+ ", sounds: " + (VmaClientConfigs.isAlertSoundEnabled() ? "on" : "off")
+				+ ", reroll: " + (VmaClientConfigs.isAutoRerollEnabled() ? "on" : "off")
 				+ ", hud ordering: " + (VmaClientConfigs.isHudOrderingEnabled() ? "on" : "off"));
 		if (VmaClientConfigs.isHudOrderingEnabled() && ModifierOrdering.getLastOrdered() != null) {
 			lines.add("[VMA] HUD order (first -> last): " + String.join(", ", ModifierOrdering.getLastOrdered()));

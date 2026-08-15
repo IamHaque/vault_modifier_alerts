@@ -29,6 +29,11 @@ archivesBaseName = 'vault_modifier_alerts'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
+// Windows default locale is CP-1252; without this, non-ASCII string literals
+// are compiled as mojibake. Source files are UTF-8.
+compileJava.options.encoding = 'UTF-8'
+compileTestJava.options.encoding = 'UTF-8'
+
 minecraft {
     mappings channel: 'parchment', version: '2022.11.06-1.18.2'
 
@@ -74,6 +79,7 @@ dependencies {
 }
 
 processResources {
+    filteringCharset = 'UTF-8'
     def replaceProperties = [
             mod_version: mod_version
     ]

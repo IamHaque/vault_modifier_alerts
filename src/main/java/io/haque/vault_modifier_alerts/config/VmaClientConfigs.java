@@ -36,6 +36,17 @@ public final class VmaClientConfigs {
 	public static final ForgeConfigSpec.DoubleValue DOWNED_VOLUME;
 	public static final ForgeConfigSpec.DoubleValue DOWNED_PITCH;
 
+	public static final ForgeConfigSpec.BooleanValue AUTO_REROLL_ENABLED;
+	public static final ForgeConfigSpec.IntValue AUTO_REROLL_TICK_INTERVAL;
+	public static final ForgeConfigSpec.IntValue AUTO_REROLL_ROLL_GAP_TICKS;
+	public static final ForgeConfigSpec.IntValue AUTO_REROLL_ROLL_TIMEOUT_TICKS;
+	public static final ForgeConfigSpec.IntValue AUTO_REROLL_MAX_ROLLS;
+	public static final ForgeConfigSpec.BooleanValue AUTO_REROLL_RESET_POTENTIAL;
+	public static final ForgeConfigSpec.ConfigValue<String> REROLL_SUCCESS_SOUND_EVENT;
+	public static final ForgeConfigSpec.ConfigValue<String> REROLL_STOP_SOUND_EVENT;
+	public static final ForgeConfigSpec.DoubleValue REROLL_VOLUME;
+	public static final ForgeConfigSpec.DoubleValue REROLL_PITCH;
+
 	static {
 		ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
 
@@ -67,6 +78,21 @@ public final class VmaClientConfigs {
 		DOWNED_TEAMMATE_SOUND_ENABLED = builder.define("teammateDownedSoundEnabled", true);
 		DOWNED_VOLUME = builder.defineInRange("volume", 1.0D, 0.0D, 2.0D);
 		DOWNED_PITCH = builder.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
+		builder.pop();
+
+		builder.push("Auto Reroll");
+		AUTO_REROLL_ENABLED = builder.define("enabled", false);
+		AUTO_REROLL_TICK_INTERVAL = builder.defineInRange("tickInterval", 4, 2, 200);
+		AUTO_REROLL_ROLL_GAP_TICKS = builder.defineInRange("rollGapTicks", 2, 1, 40);
+		AUTO_REROLL_ROLL_TIMEOUT_TICKS = builder.defineInRange("rollTimeoutTicks", 60, 10, 400);
+		AUTO_REROLL_MAX_ROLLS = builder.defineInRange("maxRolls", 0, 0, Integer.MAX_VALUE);
+		AUTO_REROLL_RESET_POTENTIAL = builder.define("autoResetPotential", true);
+		REROLL_SUCCESS_SOUND_EVENT = builder.define("successSoundEvent",
+				VmaReference.DEFAULT_REROLL_SOUND_EVENT, VmaClientConfigs::isValidSoundEventId);
+		REROLL_STOP_SOUND_EVENT = builder.define("stopSoundEvent",
+				VmaReference.DEFAULT_REROLL_SOUND_EVENT, VmaClientConfigs::isValidSoundEventId);
+		REROLL_VOLUME = builder.defineInRange("volume", 1.0D, 0.0D, 2.0D);
+		REROLL_PITCH = builder.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
 		builder.pop();
 
 		SPEC = builder.build();
@@ -113,6 +139,46 @@ public final class VmaClientConfigs {
 
 	public static String downedSoundEvent() {
 		return DOWNED_SOUND_EVENT.get();
+	}
+
+	public static boolean isAutoRerollEnabled() {
+		return AUTO_REROLL_ENABLED.get();
+	}
+
+	public static void setAutoRerollEnabled(boolean value) {
+		AUTO_REROLL_ENABLED.set(value);
+	}
+
+	public static int autoRerollTickInterval() {
+		return AUTO_REROLL_TICK_INTERVAL.get();
+	}
+
+	public static int autoRerollRollGapTicks() {
+		return AUTO_REROLL_ROLL_GAP_TICKS.get();
+	}
+
+	public static int autoRerollRollTimeoutTicks() {
+		return AUTO_REROLL_ROLL_TIMEOUT_TICKS.get();
+	}
+
+	public static int autoRerollMaxRolls() {
+		return AUTO_REROLL_MAX_ROLLS.get();
+	}
+
+	public static boolean isAutoResetPotentialEnabled() {
+		return AUTO_REROLL_RESET_POTENTIAL.get();
+	}
+
+	public static void setAutoResetPotential(boolean value) {
+		AUTO_REROLL_RESET_POTENTIAL.set(value);
+	}
+
+	public static String rerollSuccessSoundEvent() {
+		return REROLL_SUCCESS_SOUND_EVENT.get();
+	}
+
+	public static String rerollStopSoundEvent() {
+		return REROLL_STOP_SOUND_EVENT.get();
 	}
 
 	public static List<String> watchedModifiers() {

@@ -88,6 +88,16 @@ Why this option over the alternatives.
 | DEC-019 | Client commands for debug + sound toggles                   | RESOLVED | 2026-08-12 |
 | DEC-020 | F2 order = anti-anchor edge (permanents first, temporals last) | RESOLVED | 2026-08-12 |
 | DEC-021 | Temporal bucket direction: longest-lasting first (descending) | RESOLVED | 2026-08-12 |
+| DEC-022 | F3 operation selector: re-roll ops only; reset_potential automatic | RESOLVED | 2026-08-15 |
+| DEC-023 | F3 panel drawn inside the station screen via mixin (no separate Screen) | RESOLVED | 2026-08-15 |
+| DEC-024 | F3 applicability guard source: VaultGearTierConfig groups per scope | RESOLVED | 2026-08-15 |
+| DEC-025 | F3 engine press semantics, stop reasons & 1.18.2 API facts | RESOLVED | 2026-08-15 |
+| DEC-026 | F3 panel drawing/input routing via framework element + title/row math | RESOLVED | 2026-08-15 |
+| DEC-027 | Runtime testing = user-tests built jar in Prism instance | RESOLVED | 2026-08-15 |
+| DEC-028 | F3 GUI revamp: dropdowns, human names, toggles, layout engine | RESOLVED | 2026-08-15 |
+| DEC-029 | Typed tier-config parsing, ability names, threshold retention, spacing | RESOLVED | 2026-08-15 |
+| DEC-030 | Effect-avoidance chance ranges, name fixes, status wording, reset counter | RESOLVED | 2026-08-15 |
+| DEC-031 | Multi-target watch list: per-target mins, stop condition, picker UX | RESOLVED | 2026-08-15 |
 
 ---
 
@@ -1031,4 +1041,576 @@ should be reversed" — i.e. longest-lasting temporal first, soonest-expiring la
 
 ---
 
+### DEC-022 — F3 operation selector: re-roll operations only; reset_potential automatic
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+- **Relates to:** F3_AUTO_REROLL_PLAN.md §3/§4
+
+**Context**
+The Artisan Station exposes many operations through
+`VaultArtisanStationContainer.getModificationActions()` (reforge_all, reforge_affix_prefix/
+suffix, reforge_implicits, reset_potential, flat modifiers, etc.). The F3 selector must list
+only operations that actually roll modifiers toward a target — and the owner approved
+auto-using `reset_potential` (Opportunistic Focus) instead of listing it.
+
+**Decision**
+The panel lists only the 4 re-roll operations (`the_vault:reforge_all`,
+`reforge_affix_prefix`, `reforge_affix_suffix`, `reforge_implicits`), identified via
+`ModifierCatalog.isRerollOperation` (OperationScope != null). `reset_potential` is **not**
+selectable: the engine presses it automatically (at most once per run) when the selected
+operation is disabled for lack of potential and `autoResetPotential` (default `true`) is on;
+if it cannot be pressed, the run stops with OUT_OF_POTENTIAL. Note reforge_all only re-rolls
+PREFIX+SUFFIX (implicits untouched — jar-verified `reForgeAllModifiers`).
+
+**Rationale**
+Every listed operation is a chaseable roll (a run on `reset_potential` could never succeed —
+it yields no modifier); reusing the container's own action list keeps the UI honest and
+version-robust.
+
+**Alternatives considered**
+
+1. List `reset_potential` as a fifth operation — rejected: it never rolls a modifier, so a
+   run could never reach SUCCESS on it.
+2. Hard-code the auto-reset without a config — rejected: the owner asked for a toggle.
+
+**Impact**
+
+- Plan: §3 (catalog), §4.2 (selector)
+- Config: `autoResetPotential`
+- Stories: F3 (engine, panel, commands)
+
 ---
+
+### DEC-023 — F3 panel drawn inside the station screen via mixin (no separate Screen)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The owner required the F3 GUI to never overlap/obstruct the Artisan Station GUI. A separate
+`Screen` cannot satisfy this: opening one replaces the station screen (breaking container
+rendering) — and the station's window + buttons occupy most of the screen. The station
+screen renders via `render` (SRG `m_6305_`, inherited from `AbstractElementContainerScreen`)
+and receives clicks via `mouseClicked` (SRG `m_7933_`); the private `attemptCraft`
+(`GearModificationAction`) is the exact code path of a button press.
+
+**Decision**
+`RerollPanel` is a plain drawable rendered at TAIL of `m_6305_` by
+`mixin/artisan/MixinVaultArtisanStationScreen`, anchored **outside** the station window rect
+(right side preferred, left fallback, clamped to screen bounds). Clicks inside the panel
+rect are consumed at HEAD of `m_7933_` (cancellable) before the station sees them. The
+engine triggers presses through the duck interface `ArtisanStationScreenAccessor`
+(`vma$triggerAction` → `@Shadow attemptCraft`); a HEAD inject on `attemptCraft` feeds
+`AutoRerollEngine.onCraftTriggered` (cooldown/double-click protection). No Screen subclass
+is created; the panel follows the station lifecycle (engine stops on screen close). The P
+key (KeyBindings, `ClientRegistry.registerKeyBinding` in FMLClientSetupEvent) toggles panel
+visibility.
+
+**Rationale**
+Single-screen overlay is the only design that both keeps the station interactive and
+satisfies the no-overlap requirement; the duck interface is the established accessor
+pattern (`tracker.VaultModifierTimeAccessor`).
+
+**Alternatives considered**
+
+1. Standalone `RerollScreen` opened on top — rejected: replaces the station, breaks its
+   rendering, cannot avoid overlap.
+2. Reflection on private `attemptCraft` — rejected: fragile, bypasses the accessor pattern.
+3. Render a vanilla `Screen`/widget layer inside the station — rejected: over-engineering.
+
+**Impact**
+
+- Plan: §3 (mixins), §4.1 (panel)
+- Files: `mixin/artisan/MixinVaultArtisanStationScreen`, `ArtisanStationScreenAccessor`,
+  `feature/reroll/RerollPanel`, `event/KeyBindings`; mixins.json entry added atomically
+- Stories: F3 (panel, mixin)
+
+---
+
+### DEC-024 — F3 applicability guard source: VaultGearTierConfig groups per scope
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The owner required that impossible targets (e.g. an attack-damage modifier on a helmet) can
+never be selected or chased. The candidate pool must come from the same data the station's
+re-roll itself uses, or the guard and the roll would disagree.
+
+**Decision**
+`ModifierCatalog` derives candidates from
+`VaultGearTierConfig.getConfig(gear).getModifierGroup(ModifierAffixTagGroup)` for the
+operation's scope (PREFIX / SUFFIX / IMPLICIT / PREFIX_SUFFIX — affix groups via
+`ModifierAffixTagGroup.ofAffixType`), taking each `ModifierTierGroup` whose
+`getModifiersForLevel(gear item level)` is non-empty; display names come from the
+`VaultGearAttributeRegistry` attribute reader. `ModifierCatalog.isApplicable` re-validates
+the target at **every** engine evaluation, so a gear swap mid-run that removes the target
+stops the run with INVALID_TARGET instead of pressing a disabled action.
+
+**Rationale**
+A single source of truth identical to the roll itself; runtime re-validation covers the
+mid-run gear-change case that a static selector could not.
+
+**Alternatives considered**
+
+1. Static allow-list of modifier ids — rejected: version-sensitive, diverges from the roll
+   pool.
+2. Always allow, rely on the game to reject — rejected: violates the owner requirement.
+
+**Impact**
+
+- Plan: §3 (catalog), §4.3 (INVALID_TARGET)
+- Stories: F3 (catalog, engine, panel)
+
+---
+
+### DEC-025 — F3 engine press semantics, stop reasons & 1.18.2 API facts
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The F3 engine must press the exact same button path as a player click (canApply gate +
+bronze cache invalidation + `VaultArtisanRequestModificationMessage`) without reimplementing
+any game mechanic (owner constraint), classify why an action is disabled, and alert the user
+with a stop reason. During implementation, several 1.18.2 API facts had to be pinned down.
+
+**Decision**
+`AutoRerollEngine` presses only through the accessor (`attemptCraft`); presses are
+rate-limited by `tickInterval` (default 15 ticks); a roll is in-flight until the gear slot
+stack changes (`ItemStack.matches` on the copy taken at press time; `rollTimeoutTicks`
+default 60 → TIMEOUT); `maxRolls` (0 = unlimited) caps presses → MAX_ROLLS; a disabled
+action is classified with `VaultGearCraftingHelper.reducePotential(gear.copy(), player,
+modification)` — `false` ⇒ OUT_OF_POTENTIAL (one auto `reset_potential` per run if enabled
+and available, else stop), otherwise OUT_OF_MATERIALS. Stop reasons: SUCCESS (target
+modifier id present in the gear's modifiers for the operation scope), NO_GEAR,
+OUT_OF_MATERIALS, OUT_OF_POTENTIAL, INVALID_TARGET, MAX_ROLLS, TIMEOUT, SCREEN_CLOSED,
+STOPPED. SUCCESS plays `successSoundEvent`, every other stop plays `stopSoundEvent`
+(defaults `minecraft:block.note_block.pling`).
+
+**Verified 1.18.2 facts**
+
+- `ItemStack.matches(ItemStack, ItemStack)` is the static tag-compare; the two-arg static
+  `is(...)` form is 1.19+.
+- `getGuiLeft()`/`getGuiTop()`/`getXSize()`/`getYSize()` do **not** exist in vanilla 1.18.2
+  `AbstractContainerScreen` (confirmed against the official Mojang client mappings) — they
+  are **Forge 1.18.2 patches**; VH's own `AbstractElementContainerScreen.getGuiSpatial()`
+  bytecode calls them, proving their runtime presence. Our panel uses them directly.
+- Java 17 (project target) forbids `case null` in switch statements.
+- `m_6305_` (render) is declared on `AbstractElementContainerScreen`; `m_7933_
+  (mouseClicked)` on `VaultArtisanStationScreen`; both public — verified on the SRG jar.
+
+**Rationale**
+Zero game-mechanic reimplementation (owner constraint); classification reuses the game's own
+potential reducer on a copy (client-safe, read-only), so stop reasons match what the player
+would see.
+
+**Alternatives considered**
+
+1. Send `VaultArtisanRequestModificationMessage` directly — rejected: bypasses the canApply
+   gate and bronze cache, duplicating game logic.
+2. Click blind on disabled buttons and guess the reason — rejected: wrong classification,
+   no reliable stop reasons.
+
+**Impact**
+
+- Plan: §4.3 (engine), §3 (panel anchor)
+- Stories: F3 (engine, tick wiring, commands, sounds)
+
+---
+
+---
+
+### DEC-026 - Auto-reroll panel as a VH framework element + min-value threshold
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The F3 panel was previously drawn/clicked directly from the artisan screen mixin using raw
+rect math. The Remastered VH 3.15 screen framework draws everything through elements, so
+the panel was refactored into a real framework element added from the screen constructor
+(`addElement(RerollPanelElement.create(screen))` in `<init>` RETURN, exactly like reference
+mods), rendering and click-routing through the framework pipeline.
+
+**Decision**
+Two classes, split model/rendering:
+
+1. `RerollPanelElement` (thin, `io.haque.vault_modifier_alerts.feature.reroll`) -
+   `AbstractSpatialElement` + `IRenderedElement` + `IGuiEventElement`; positioning in
+   `layout((screenSize, gui, parent, world) -> world.positionXY(x, y))` anchored left of
+   the station window with right-side fallback (`MARGIN = 22`); `render`/`onMouseClicked`
+   delegate to the model. Panel size constants live in `RerollPanel` (single source of
+   truth, 150x122).
+2. `RerollPanel` (model + raw draw/hit code) - selection state (operationIndex,
+   targetIndex), min-value threshold state (minInputText draft, thresholdEnabled,
+   thresholdValue), `draw(...)`, `hitTest(...)`, `handleClick(...)`, and the keyboard
+   feed `acceptChar(char)` / `inputKey(int)` / `isMinInputFocused()`.
+
+Min-value threshold rules:
+
+- Draft accepts digits and at most one `.` (max 6 chars); empty draft = "any" (no
+  threshold). Commit on Enter, KP-Enter, Escape, or focus loss (`commitMinInput()`).
+- Commit strips a trailing `.`, parses, and clamps to the target's reachable
+  `RollRange` (min/max in display units; percent ranges are stored as fractions and
+  converted x100 in `ModifierCatalog.rollRange`); the draft is normalised with
+  `formatDisplay(value, false)` (no `%` in the draft - the suffix is only added when
+  drawing the committed value).
+- The `<`/`>` arrows on the Min row step by `RollRange.step()` (clamped); the field is
+  only rendered/clickable when the target range is numeric.
+- Because the framework does not route typed chars to elements owned by a `Screen`
+  (only click/render/update), `ClientTickEvents` feeds the field through
+  `ScreenEvent.KeyboardKeyPressedEvent.Pre` (`inputKey`) and
+  `ScreenEvent.KeyboardCharTypedEvent.Pre` (`acceptChar`), both cancelling the event
+  when consumed. `isMinInputFocused()` gates the P-key toggle so typing never toggles
+  the panel. Escape while focused is consumed (does not close the screen).
+
+**Verified framework API facts (reference for future widget work)**
+
+- `AbstractSpatialElement` exposes `public final int x()/y()/width()/height()`.
+- Element `layout` takes a 4-arg lambda `(ISpatial screenSize, ISpatial gui, ISpatial
+  parent, ISpatial world)`; `gui.left()/right()/top()` describe the window rect.
+- Widget surface verified by javap (not yet used - raw draw kept for now):
+  `DropdownElement(ISpatial, List<String>, Consumer<String>)`;
+  `NineSliceTextInputElement(ISpatial, NineSlice$TextureRegion, Font)` +
+  `setPadding/setMaxLength/setUsePlaceholder/setPlaceholderText/onTextChanged/
+  onEnterPressed/setText/getText/setFocused/isFocused` + `protected isValidChar(char)`;
+  `NineSliceButtonElement(ISpatial, NineSliceButtonTextures, Runnable)` +
+  `label(Supplier<Component>, LabelTextStyle$Builder)` + `setDisabled/setVisible(
+  Supplier<Boolean>)`; `LabelElement(pos, component, style)` / `(pos, size, component,
+  style)` + `set(Component)/setSupplier(...)`; `ScreenTextures` has
+  `INSET_BLACK_BACKGROUND`, `BUTTON_EMPTY_TEXTURES`,
+  `BUTTON_EMPTY_DARK_GRAY_TEXTURES`, `BUTTON_EMPTY_GREEN_TEXTURES`.
+
+**Rationale**
+The framework pipeline now owns render ordering, click routing, and z-order; the model
+class keeps all state and validation testable without the UI. Threshold guards reuse the
+same `ModifierCatalog.rollRange` data the game's own roll uses (see DEC-022), so "never
+exceed the target's max roll" holds by construction.
+
+**Alternatives considered**
+
+1. Full widget tree (DropdownElement + NineSliceTextInputElement) - rejected for now:
+   the raw-draw port was the minimal safe refactor; the widget surface above is verified
+   and documented for a future pass.
+2. Keep mixin-driven drawing - rejected: fights the framework element pipeline.
+
+**Impact**
+
+- Plan: 3 (panel anchor), 4.4 (threshold)
+- Stories: F3 (panel, threshold)
+- Caveat: in-game smoke test of the new element panel (rendering, min-field focus, step
+  arrows, P-key behaviour) has NOT been run yet - install
+  `build/libs/vault_modifier_alerts-<mod_version>.jar` (see DEC-027) into the Prism
+  instance first.
+
+---
+
+---
+
+### DEC-027 - Build & install workflow for the VH instance (session reference)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Toolchain
+
+**Context**
+The mod is developed against the Remastered VH pack installed via Prism Launcher, and
+every session needs the same toolchain facts.
+
+**Decision**
+
+- VH jar to inspect: `the_vault-1.18.2-20.0.3-remastered.6872.jar` inside the instance's
+  `minecraft/mods/` folder (no decompile needed). VH classes are NOT obfuscated, so
+  mixins use `remap = false` and real method names.
+- Signature verification without decompiling:
+  `javap -p -classpath <vault-jar-path> 'iskallia.vault.client.gui.framework.element.spi.<Class>'`
+  (also works for `element.<Class>`, `screen.block.<Class>`, etc.).
+- Build: `gradlew build` (Java 17); artifact lands at
+  `build/libs/vault_modifier_alerts-<mod_version>.jar` (`mod_version` in
+  `gradle.properties`, currently 0.2.4). Compile-only fast check: `gradlew compileJava`.
+- Install: copy the built jar over the same-named jar in the instance's `minecraft/mods/`
+  folder (or remove the old version first), then launch via Prism. Do not reference
+  absolute instance paths in committed files.
+- The repo keeps four tracking docs current: `RULES.md` (process),
+  `MODIFIER_ALERTS_SPEC.md` (what to build), `F3_AUTO_REROLL_PLAN.md` (auto-reroll
+  stories), `DECISIONS.md` (why - this file).
+
+**Rationale**
+Fast, reliable iteration loop without decompiler tooling; documented once so future
+sessions do not rediscover the jar location or command shape.
+
+**Impact**
+
+- All future sessions: read this entry before touching VH internals.
+
+---
+
+---
+
+### DEC-029 - Typed tier-config parsing, ability names, threshold retention, spacing (owner request)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+Owner review of the F3 panel after DEC-028: (a) every ability/talent re-roll
+candidate showed the same "Mod Added Ability Level" (resp. "Mod Added Talent Level")
+prefix wording instead of the ability/it adds; (b) "No Numeric Threshold" appeared for
+the selected attribute and typed threshold values were silently cleared instead of
+accepted; (c) rows were cramped; (d) over-long text should reveal the full text on
+hover. Reference implementation studied: `radimous/VHatCanIRoll` (same data path).
+
+**Root causes (verified against the Remastered instance's pack configs and jar)**
+1. `ModifierTier.getModifierConfiguration()` returns **typed config objects**, not
+   `JsonObject` (e.g. `IntegerAttributeGenerator.Range` with public `min/max/step`,
+   `Float/DoubleAttributeGenerator.Range` with private fields, `AbilityLevelAttribute.Config`
+   with `abilityKey`/`levelChange`), so the old `instanceof JsonObject` check was always
+   false and every range resolved to non-numeric.
+2. Candidate display names came from the reader/group-id strings ("Ability Level",
+   "Mod Added Ability Level Icebolt"); the real per-tier configs carry the ability id
+   (`"value": {"abilityKey": "Ice_Bolt_Base", "levelChange": N}`).
+3. The old self-heal cleared a committed threshold whenever it considered the target
+   non-numeric.
+
+**Decision**
+1. **Numeric extraction:** `rollRange` uses the attribute's own generator API first -
+   `generator.getMinimumValue/getMaximumValue` over the level-applicable tiers
+   (`tierGroup.getModifiersForLevel(gearLevel)`, all-tiers fallback) - plus typed
+   casing: `IntegerAttributeGenerator.Range` public fields (step), ability/talent
+   `Config` as point values ("+N levels", step 1). Float/Double percentage ranges
+   store fractions and are scaled into display units (×100) exactly like
+   `toDisplayUnits` does, so thresholds stay comparable. Raw `JsonObject` tier blocks
+   remain supported as a fallback for custom attributes without a generator.
+2. **Ability/talent names:** display = the ability/talent name only, from
+   `AbilityLevelAttribute.Config.getAbilityKey()` / `TalentLevelAttribute.Config.getTalent()`
+   -> `ModConfigs.ABILITIES.getAbilityById(...)` / `ModConfigs.TALENTS.getTalentById(...)`
+   -> `Skill.getName()`; special keys "all_abilities"/"all_talents" -> "All Abilities" /
+   "All Talents"; `AbilityType.matches` -> "All <Type> Abilities"; fallback humanizes
+   the key with a trailing "_Base" tag trimmed. `toDisplayUnits` handles
+   `AbilityLevelAttribute`/`TalentLevelAttribute` values by their `levelChange`, so the
+   engine can compare "+N levels" thresholds.
+3. **Threshold retention:** `commitMinInput` keeps any valid number - clamped to the
+   known roll range when numeric, kept as-is (compare "at least X" unclamped) when the
+   range is unknown; only unparseable text clears. `stepMin` uses ±step when known and
+   ±1 unclamped when not. The draw-time self-heal reset is removed; the range row shows
+   "Range: ?" when the range could not be read.
+4. **Spacing:** panel width 200 -> 216, row height 11 -> 14, title band 12 -> 18, side
+   padding 6 -> 8, buttons 12 -> 14, dropdown rows 11 -> 14 with 8 visible by default
+   (clamped 3..8), all label/hit zones recomputed in `RerollPanelLayout`.
+5. **Hover popover:** any text truncated to its row (Focus/Modifier values, range row,
+   status line, dropdown items) shows its full text in a small dark popover racing the
+   cursor (manually wrapped, screen-clamped), drawn after the panel frame.
+
+**Rationale**
+Reading values through VH's own generator API (as `VHatCanIRoll` does) makes the range
+and threshold logic correct for every generator type the game ships, instead of
+guessing JSON shapes; names come from the same config values the game rolls with.
+
+**Impact**
+- Files: `ModifierCatalog`, `RerollPanel`, `RerollPanelLayout`, `README.md`,
+  `F3_AUTO_REROLL_PLAN.md`.
+- Engine state machine, stop reasons, sounds, `/vma reroll` contract: unchanged.
+- DEC-028's "Impact" numbers are superseded: base panel height is now ~150 px,
+  width 216.
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+The owner reviewed the shipped F3 panel and asked for a GUI revamp, referencing
+`massuus/vault-party-ui` as a visual/UX reference (dark panels, gold `0xFFE3C38C` accents,
+popup/button-list selectors). Complaints: (a) `‹ ›` arrow cycling for operation/target is
+too basic - click should open a full picker; (b) modifier names were code-like in some
+fallback paths (raw id path) instead of human text; (c) no on/off auto-reroll toggle in
+the GUI; (d) status/potential info too thin; (e) hand-maintained draw-vs-click row math
+in `RerollPanel` is brittle. The previous panel also truncated names to 16 chars and the
+whole GUI was deleted-and-rewritten as instructed, keeping the engine's behaviour.
+
+**Decision**
+
+1. **Selector UX:** Focus and Modifier rows open an **in-panel dropdown** (the framework
+   element's rect grows via `setHeight` + `requestLayout` when a dropdown is open) listing
+   every option; Escape / arrows / wheel scroll it, clicks outside close it. A separate
+   popup `Screen` (vault-party-ui `DifficultySelectionScreen` style) was rejected: the
+   engine stops a run with `SCREEN_CLOSED` whenever `mc.screen` is not the station screen,
+   so any popup screen would kill a running roll on open.
+2. **Input routing:** mouse clicks stay on the framework element (proven path);
+   keyboard (Escape/Up/Down for dropdown, editing keys for the min field), mouse-wheel
+   scroll and click-outside-to-close are handled by screen-level Forge events in
+   `ClientTickEvents` (the same proven path as the existing key/char routing). Wheel and
+   mouse events are consumed/cancelled exactly once; the element does NOT override
+   `onMouseScrolled` to avoid double-handling.
+3. **Human names:** `ModifierCatalog` gains `humanizeId(path)` (snake/kebab -> title
+   case) as the guaranteed fallback; primary display stays the game's own
+   `VaultGearModifierReader.getModifierName()`. New `RollRange.displayText()` renders the
+   rollable band ("2.0 - 6.0%") in the dropdown and the Min range row.
+4. **GUI toggle:** new "Auto-reroll" checkbox flips config `enabled`
+   (`VmaClientConfigs.setAutoRerollEnabled`). The panel no longer hides itself when the
+   config is off (`RerollPanelElement.isVisible()` now only checks `panel.visible`), so
+   the toggle stays reachable from the station; controls are dimmed and the engine keeps
+   its existing off-switch stop.
+5. **Status/potential:** potential row is colored (red at 0) and shows "~N rolls" from
+   `ModConfigs.VAULT_GEAR_MODIFICATION_CONFIG.getPotentialUsed(...)`; status line shows
+   rolls, the last rolled target value (`AutoRerollEngine.lastTargetValue`, recorded in
+   `targetRolled` for every roll), and the existing stop-reason text.
+6. **Layout engine:** new `RerollPanelLayout` computes every row/button/dropdown rect
+   once per frame; `draw` and `handleClick`/`handleScroll` both use `regionAt(...)`,
+   removing the parallel row-math entirely.
+7. **Min threshold:** kept (click-to-type, `-`/`+` step, clamps to the target's roll
+   range) and now self-heals: a threshold that no longer fits a newly selected
+   non-numeric modifier is cleared, and a range hint row shows the rollable band.
+
+**Rationale**
+Matches the reference UX while keeping the proven single-screen element architecture and
+the engine's stop-reason semantics untouched; gives the owner the requested "click for
+full list" behaviour and human-readable modifiers.
+
+**Alternatives considered**
+
+1. Popup `Screen` per vault-party-ui (`DifficultySelectionScreen`) - rejected: stops
+   running rolls (engine screen guard), adds screen-swap complexity.
+2. Rebuild with vanilla `Button`s in a bigger panel - rejected: framework elements are
+   the codebase's proven pattern for this screen.
+3. Keep `‹ ›` cycling with a longer value field - rejected: no full-list visibility,
+   the exact pain point reported.
+
+**Impact**
+
+- Files: `RerollPanel`, `RerollPanelElement`, `RerollPanelLayout` (new),
+  `ModifierCatalog`, `AutoRerollEngine`, `VmaClientConfigs`, `ClientTickEvents`,
+  `README.md`, `F3_AUTO_REROLL_PLAN.md` (§4.4 marked superseded).
+- Engine state machine, stop reasons, sounds, `/vma reroll` contract: unchanged.
+- Panel minimum height grows from 122 to 116+dropdown (base 116), width 150 -> 200;
+  anchored left of the window with right-side fallback, clamped so the full height
+  (dropdown included) fits on screen.
+
+---
+
+### DEC-030 - Effect-avoidance ranges, name fixes, status wording, reset counter (owner request)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+Owner review of the panel after DEC-029: (a) the status line "Ready · min 3" was
+confusing ("what is it? why is it needed?") and its `·` glyph renders as garbage in
+Minecraft's font; (b) "Mod Effect Avoidance" should read "Effect Avoidance" and shows
+no min-max roll band; (c) the `-`/`+` step buttons had no background and uncentered
+glyphs; (d) when auto-reset-potential is on, the panel should count and show the
+resets during a run.
+
+**Root causes (verified against pack configs + jar)**
+
+1. The armor avoidance mods (`the_vault:mod_effect_avoidance` on chest/legs/helm/boots,
+   `crafted_effect_avoidance`, `u_effect_avoidance`) are **list-type**
+   `the_vault:effect_list_avoidance` (effect list + one shared chance); drink/unique and
+   the idol suffixes use single-effect `the_vault:effect_avoidance`. Both Config classes
+   (`EffectAvoidanceGearAttribute$Config` / `EffectAvoidanceListGearAttribute$Config`)
+   have **no public getters**; the numeric band is only reachable as the *value type*:
+   both generators' `getMinimumValue/getMaximumValue` return the attribute itself, and
+   both implement `IEffectAvoidanceChanceAttribute.getChance()` (fraction).
+2. Neither avoidance reader overrides `getModifierName()`, so names fell back to the
+   humanized raw id path "Mod Effect Avoidance".
+3. Tiers store `minChance/maxChance/step` as fractions (0.1 = 10%).
+
+**Decision**
+
+1. **Chance band:** `ModifierCatalog.rangeValue` handles
+   `IEffectAvoidanceChanceAttribute` min/max results -> `RangeValue(chance*100, chance*100,
+   step 1, percent=true)`, so the dropdown/range row shows "10% - 80%" on chestplate
+   (tiers 0.1/0.31/0.61/0.8). `toDisplayUnits` maps any
+   `IEffectAvoidanceChanceAttribute` value to `getChance()*100`, so "at least X" compares
+   the rolled chance in percent units like every other percentage attribute.
+2. **Name:** the `displayName` fallback strips a leading `mod_` id prefix before
+   humanizing (helper public as `stripModPrefix`) -> "Effect Avoidance" (idol suffixes:
+   "... Poison" etc; `crafted_`/`u_` stay as-is).
+3. **Status line:** ASCII wording - `Ready : goal at least 3` (or `...3%` for percent
+   targets), `Ready : any roll`, `Ready : N targets`, `Add a target modifier`; the
+   `Stopped: ...` roll-count separator changes `·` -> `-`.
+4. **Step buttons:** the `-`/`+` hit zones now draw a real button rect (12x10, inset 2)
+   with the game's button background (`0xFF303030`, `HOVER_COLOR` on hover, dimmed when
+   the config is off) and the glyph centered via `drawCentered`.
+5. **Reset counter:** `AutoRerollEngine` gains `potentialResetsThisSession` (incremented
+   in `handleOutOfPotential`, reset per run) + accessor; a new last panel row
+   (`counterY`) prints `Potential reset x N` while rolling with
+   `isAutoResetPotentialEnabled()`.
+
+**Rationale**
+The chance band is semantically the rollable value for both avoidance types and matches
+the per-roll behaviour (the game rolls one shared chance per modifier); reading it
+through the generator API keeps DEC-029's "typed configs only" rule while the Config
+classes hide their fields.
+
+**Impact**
+
+- Files: `ModifierCatalog`, `RerollPanel`, `RerollPanelLayout`, `AutoRerollEngine`.
+- Panel gains one optional bottom row (only during a run with reset enabled).
+- `VaultGearModifierReader.getModifierName()` stays the primary name source; the
+  `mod_` prefix strip only affects the fallback path.
+
+---
+
+### DEC-031 - Multi-target watch list, per-target mins, stop condition, picker UX (owner request)
+
+- **Date:** 2026-08-15
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+Owner request: the panel only watched one modifier; it must support adding several and
+stop auto-rerolling once *at least one* of them rolls. Owner confirmed the stop mode
+should itself be user-selectable ("whether all targets should pass or any target should
+pass and by default it should be set as any"), thresholds per target, and an explicit
+targets row + add-picker editor instead of a single toggle.
+
+**Decision**
+
+1. **Model:** `ModifierCatalog.RollTarget(id, thresholdEnabled, thresholdValue)`; the
+   panel holds `List<RollTarget>` + `focusedTarget` index; the Min row/Mode/range hint
+   edit the focused target (per-target thresholds, each clamped to its own band).
+2. **Stop condition:** `AutoRerollEngine.StopCondition { ANY, ALL }`, default ANY,
+   selected via a clickable chip on the Targets row (`any`/`all`, cycles, 24px hit
+   zone). ANY = first passing target stops; ALL = every watched target must have rolled
+   and passed at least once in the run (per-run `allPassed[]`, OR-marked per gear
+   change - a later lower roll never un-marks).
+3. **Engine contract:** `start(operation, List<RollTarget>, StopCondition)` replaces the
+   single-target overloads; `INVALID_TARGET` fires only when *no* watched target is
+   applicable to the operation scope; `targetRolled` scans scope affixes and matches per
+   modifier id (any out-of-scope target simply can never roll). `targetId()` now returns
+   the first target (compat). `/vma reroll start` logs the target count.
+4. **Editor UX:** a new "Targets" row (between Modifier and Min) shows the focused
+   target's name + `n` count and the condition chip; its dropdown lists the watch list
+   with per-entry `min X` / `any`, a `>` focus marker, and a 16px `x` remove zone.
+   The Modifier row becomes an add-picker placeholder ("add a modifier..." /
+   "+ add modifier"); dropdown items carry a `*` marker when already watched and click
+   toggles add/remove (add appends untargeted with no min and focuses it). Removing the
+   focused target shifts focus to a neighbour; empty list disables Start ("Add a target
+   modifier" status). Targets persist across operation switches (out-of-scope ones never
+   roll, shown with "Range: ?").
+5. **Layout:** rows grow by one (Targets) and one optional bottom row (reset counter,
+   DEC-030); all downstream Ys recomputed in `RerollPanelLayout` (`targetsY`,
+   `counterY`); new hit types `TARGETS_ROW`/`TARGETS_CHIP` and a
+   `DropdownMode.TARGETS` overlay.
+
+**Rationale**
+Keeps the proven single-editor Min row (per-target focused), reuses the existing
+dropdown/popover machinery for the watch list, and pins the "at least one" semantics
+the owner asked for with an explicit default.
+
+**Impact**
+
+- Files: `ModifierCatalog`, `AutoRerollEngine`, `RerollPanel`, `RerollPanelLayout`,
+  `VmaClientCommands`, `README.md`, `F3_AUTO_REROLL_PLAN.md`.
+- `/vma reroll start` uses the updated `RerollSelection(operationId, targets,
+  stopCondition)`; engine public API changed (list-based start).
+- Base panel height grows by one row (~178 px), width stays 216.
