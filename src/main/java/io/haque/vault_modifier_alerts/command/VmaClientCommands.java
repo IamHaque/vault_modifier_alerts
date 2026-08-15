@@ -58,8 +58,11 @@ public final class VmaClientCommands {
 
 	private static int setRerollEnabled(CommandSourceStack source, boolean value) {
 		VmaClientConfigs.setAutoRerollEnabled(value);
-		if (!value && AutoRerollEngine.getInstance().isRunning()) {
-			AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
+		if (!value) {
+			AutoRerollEngine.getInstance().cancelResume();
+			if (AutoRerollEngine.getInstance().isRunning()) {
+				AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
+			}
 		}
 		source.sendSuccess(new TextComponent("[VMA] Auto-reroll " + (value ? "enabled" : "disabled")), false);
 		return Command.SINGLE_SUCCESS;

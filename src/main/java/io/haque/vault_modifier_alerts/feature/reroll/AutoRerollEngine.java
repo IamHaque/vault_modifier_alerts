@@ -55,6 +55,7 @@ public final class AutoRerollEngine {
 
 	private boolean running;
 	private boolean inFlight;
+	private boolean resumeWaiting;
 	private int potentialResetsThisSession;
 	private ResourceLocation operationId;
 	private List<RollTarget> targets = List.of();
@@ -90,6 +91,7 @@ public final class AutoRerollEngine {
 		lastRolledValues = new double[targets.size()];
 		running = true;
 		inFlight = false;
+		resumeWaiting = false;
 		potentialResetsThisSession = 0;
 		lastPressedGear = null;
 		lastEvaluatedGear = null;
@@ -151,11 +153,18 @@ public final class AutoRerollEngine {
 			stop(StopReason.SCREEN_CLOSED, false);
 			return;
 		}
-		if (!running) {
-			return;
-		}
 		VaultArtisanStationContainer container = (VaultArtisanStationContainer) station.getMenu();
 		ItemStack gear = container.getGearInputSlot().getItem();
+
+		if (!running) {
+			if (resumeWaiting && !gear.isEmpty()) {
+				GearModificationAction action = findAction(container, operationId);
+				if (action != null && action.canApply(container, mc.player)) {
+					resume();
+				}
+			}
+			return;
+		}
 
 		if (inFlight) {
 			if (gearChanged(gear)) {
@@ -227,7 +236,32 @@ public final class AutoRerollEngine {
 			handleOutOfPotential(station, container, gear);
 		} else {
 			stop(StopReason.OUT_OF_MATERIALS, true);
+			resumeWaiting = true;
+			logRoll("roll #{} out of materials; waiting for focus", rolls);
 		}
+	}
+
+	/**
+	 * Restarts a run paused by {@link StopReason#OUT_OF_MATERIALS} with the same
+	 * session (roll count, values, resets) once the operation is usable again,
+	 * i.e. the player has put focus back into the station.
+	 */
+	private void resume() {
+		resumeWaiting = false;
+		running = true;
+		inFlight = false;
+		stopReason = null;
+		lastEvaluatedGear = null;
+		logRoll("Auto-reroll resumed: operation={}, targets={}, condition={}", operationId, targets, stopCondition);
+	}
+
+	public boolean isResumeWaiting() {
+		return resumeWaiting;
+	}
+
+	/** Drops a paused run without losing engine state; called when the user changes the setup. */
+	public void cancelResume() {
+		resumeWaiting = false;
 	}
 
 	public boolean isRunning() {

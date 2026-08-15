@@ -441,6 +441,7 @@ public final class RerollPanel {
 				if (AutoRerollEngine.getInstance().isRunning()) {
 					AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
 				}
+				AutoRerollEngine.getInstance().cancelResume();
 				targets.clear();
 				focusedTarget = -1;
 				minInputText = "";
@@ -453,8 +454,11 @@ public final class RerollPanel {
 				closeDropdown();
 				boolean enabled = !VmaClientConfigs.isAutoRerollEnabled();
 				VmaClientConfigs.setAutoRerollEnabled(enabled);
-				if (!enabled && AutoRerollEngine.getInstance().isRunning()) {
-					AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
+				if (!enabled) {
+					AutoRerollEngine.getInstance().cancelResume();
+					if (AutoRerollEngine.getInstance().isRunning()) {
+						AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
+					}
 				}
 			}
 			case RESET_TOGGLE -> {
@@ -611,6 +615,7 @@ public final class RerollPanel {
 
 	/** Clears every gear-specific selection (targets, thresholds, focus, operation, open dropdown). */
 	private void resetSelection() {
+		AutoRerollEngine.getInstance().cancelResume();
 		targets.clear();
 		focusedTarget = -1;
 		minInputText = "";
@@ -858,6 +863,10 @@ public final class RerollPanel {
 			text = runningStatus(engine);
 			color = ACCENT_COLOR;
 			full = targetDetail(engine);
+		} else if (engine.isResumeWaiting()) {
+			text = "Waiting for focus" + (engine.rolls() > 0 ? " - " + engine.rolls() + " rolls" : "");
+			color = WARN_COLOR;
+			full = text;
 		} else if (engine.stopReason() != null) {
 			StringBuilder suffix = new StringBuilder();
 			if (engine.rolls() > 0) {
