@@ -162,7 +162,7 @@ public final class AutoRerollEngine {
 				inFlight = false;
 				lastRollCompletedTick = mc.player.tickCount;
 			} else if (mc.player.tickCount - lastPressTick > VmaClientConfigs.autoRerollRollTimeoutTicks()) {
-				logRoll("roll #%d timeout after %d ticks", rolls, VmaClientConfigs.autoRerollRollTimeoutTicks());
+				logRoll("roll #{} timeout after {} ticks", rolls, VmaClientConfigs.autoRerollRollTimeoutTicks());
 				stop(StopReason.TIMEOUT, true);
 				return;
 			} else {
@@ -174,7 +174,7 @@ public final class AutoRerollEngine {
 			lastEvaluatedGear = gear.copy();
 			try {
 				boolean qualified = targetRolled(gear);
-				logRoll("roll #%d result: %s met %d/%d", rolls, stopCondition, metCount(), targets.size());
+				logRoll("roll #{} result: {} met {}/{}", rolls, stopCondition, metCount(), targets.size());
 				if (qualified) {
 					stop(StopReason.SUCCESS, true);
 					return;
@@ -293,7 +293,7 @@ public final class AutoRerollEngine {
 			lastPressTick = mc.player.tickCount;
 			if (countsAsRoll) {
 				rolls++;
-				logRoll("roll #%d press: %s (potential %d)", rolls, action.modification().getRegistryName(),
+				logRoll("roll #{} press: {} (potential {})", rolls, action.modification().getRegistryName(),
 						ModifierCatalog.craftingPotential(gear));
 			}
 			inFlight = true;
@@ -317,7 +317,7 @@ public final class AutoRerollEngine {
 			return;
 		}
 		potentialResetsThisSession++;
-		logRoll("roll #%d potential reset #%d", rolls + 1, potentialResetsThisSession);
+		logRoll("roll #{} potential reset #{}", rolls + 1, potentialResetsThisSession);
 		press(station, resetAction, gear, false);
 	}
 
@@ -378,7 +378,7 @@ public final class AutoRerollEngine {
 				boolean passed = !target.thresholdEnabled()
 						|| displayValue + THRESHOLD_EPSILON >= target.thresholdValue();
 				lastRolledValues[index] = displayValue;
-				logRoll("roll #%d target=%s group=%s value=%s threshold=%s passed=%s", rolls, target.id(),
+				logRoll("roll #{} target={} group={} value={} threshold={} passed={}", rolls, target.id(),
 						groupName(affixType), formatRollValue(displayValue),
 						target.thresholdEnabled() ? formatRollValue(target.thresholdValue()) : null, passed);
 				if (all) {
