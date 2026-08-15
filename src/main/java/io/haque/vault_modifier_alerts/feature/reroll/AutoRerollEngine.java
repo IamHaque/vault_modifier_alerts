@@ -122,8 +122,8 @@ public final class AutoRerollEngine {
 				}
 				values.append(targets.get(i).id()).append('=').append(formatRollValue(lastRolledValues[i]));
 			}
-			VaultModifierAlerts.LOGGER.info("[VMA] Auto-reroll stopped: reason={}, rolls={}, values=[{}]", reason,
-					rolls, values);
+			VaultModifierAlerts.LOGGER.info("[VMA] Auto-reroll stopped: reason={}, rolls={}, potentialResets={}, values=[{}]",
+					reason, rolls, potentialResetsThisSession, values);
 		}
 	}
 

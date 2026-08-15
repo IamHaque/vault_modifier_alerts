@@ -623,6 +623,11 @@ public final class RerollPanel {
 		return VmaClientConfigs.isAutoRerollEnabled() && !targets.isEmpty();
 	}
 
+	/** True when the cursor lies inside the panel's horizontal range and the given row band. */
+	private static boolean rowHovered(RerollPanelLayout layout, int mouseX, int mouseY, int y, int h) {
+		return mouseX >= layout.x && mouseX < layout.x + layout.width && mouseY >= y && mouseY < y + h;
+	}
+
 	// ------------------------------------------------------------------ draw
 
 	private void drawPanelFrame(PoseStack poseStack, RerollPanelLayout layout) {
@@ -642,7 +647,7 @@ public final class RerollPanel {
 	 */
 	private void drawRow(PoseStack poseStack, RerollPanelLayout layout, String label, String value, int y, int mouseX,
 			int mouseY, boolean open) {
-		boolean hovered = mouseY >= y && mouseY < y + RerollPanelLayout.ROW_H;
+		boolean hovered = rowHovered(layout, mouseX, mouseY, y, RerollPanelLayout.ROW_H);
 		if (open) {
 			GuiComponent.fill(poseStack, layout.x, y, layout.x + layout.width,
 					y + RerollPanelLayout.ROW_H, HIGHLIGHT_COLOR);
@@ -665,7 +670,7 @@ public final class RerollPanel {
 	 * rollable modifier; already-watched ones carry a checkmark and click toggles.
 	 */
 	private void drawModifierRow(PoseStack poseStack, RerollPanelLayout layout, int mouseX, int mouseY) {
-		boolean hovered = mouseY >= layout.modifierY && mouseY < layout.modifierY + RerollPanelLayout.ROW_H;
+		boolean hovered = rowHovered(layout, mouseX, mouseY, layout.modifierY, RerollPanelLayout.ROW_H);
 		if (dropdownMode == DropdownMode.MODIFIER) {
 			GuiComponent.fill(poseStack, layout.x, layout.modifierY, layout.x + layout.width,
 					layout.modifierY + RerollPanelLayout.ROW_H, HIGHLIGHT_COLOR);
@@ -686,7 +691,7 @@ public final class RerollPanel {
 	 */
 	private void drawTargetsRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX,
 			int mouseY) {
-		boolean hovered = mouseY >= layout.targetsY && mouseY < layout.targetsY + RerollPanelLayout.ROW_H;
+		boolean hovered = rowHovered(layout, mouseX, mouseY, layout.targetsY, RerollPanelLayout.ROW_H);
 		boolean chipHovered = hovered && mouseX >= x + width - 24;
 		boolean clearHovered = hovered && mouseX >= x + width - 44 && mouseX < x + width - 26;
 		boolean addHovered = hovered && !chipHovered && !clearHovered;
@@ -749,11 +754,11 @@ public final class RerollPanel {
 		boolean numeric = range.numeric();
 		boolean enabled = VmaClientConfigs.isAutoRerollEnabled();
 		boolean hasTarget = focused() != null;
-		boolean hoveredDec = mouseY >= layout.minY && mouseY < layout.minY + RerollPanelLayout.ROW_H
+		boolean hoveredDec = rowHovered(layout, mouseX, mouseY, layout.minY, RerollPanelLayout.ROW_H)
 				&& mouseX < x + 16;
-		boolean hoveredInc = mouseY >= layout.minY && mouseY < layout.minY + RerollPanelLayout.ROW_H
+		boolean hoveredInc = rowHovered(layout, mouseX, mouseY, layout.minY, RerollPanelLayout.ROW_H)
 				&& mouseX >= x + width - 16;
-		boolean hoveredField = mouseY >= layout.minY && mouseY < layout.minY + RerollPanelLayout.ROW_H
+		boolean hoveredField = rowHovered(layout, mouseX, mouseY, layout.minY, RerollPanelLayout.ROW_H)
 				&& mouseX >= layout.minFieldLeft() && mouseX < layout.minFieldRight();
 		boolean hasThreshold = hasTarget && focused().thresholdEnabled();
 		int buttonColor = enabled ? (hoveredDec ? TEXT_COLOR : MUTED_COLOR) : DISABLED_COLOR;
@@ -789,7 +794,7 @@ public final class RerollPanel {
 		int maxChars = (layout.width - RerollPanelLayout.PAD_X * 2) / 7;
 		if (text.length() > maxChars) {
 			text = truncate(text, maxChars);
-			if (mouseY >= layout.rangeY && mouseY < layout.rangeY + RerollPanelLayout.ROW_H) {
+			if (rowHovered(layout, mouseX, mouseY, layout.rangeY, RerollPanelLayout.ROW_H)) {
 				hoverTooltip(full, mouseX, mouseY);
 			}
 		}
@@ -813,7 +818,7 @@ public final class RerollPanel {
 
 	private void drawToggleRow(PoseStack poseStack, RerollPanelLayout layout, int x, String label, boolean enabled,
 			int y, int mouseX, int mouseY) {
-		boolean hovered = mouseY >= y && mouseY < y + RerollPanelLayout.ROW_H;
+		boolean hovered = rowHovered(layout, mouseX, mouseY, y, RerollPanelLayout.ROW_H);
 		if (hovered) {
 			GuiComponent.fill(poseStack, layout.x, y, layout.x + layout.width,
 					y + RerollPanelLayout.ROW_H, HOVER_COLOR);
@@ -826,7 +831,7 @@ public final class RerollPanel {
 	private void drawButton(PoseStack poseStack, RerollPanelLayout layout, AutoRerollEngine engine, boolean canStart,
 			int mouseX, int mouseY) {
 		boolean running = engine.isRunning();
-		boolean hovered = mouseY >= layout.buttonY && mouseY < layout.buttonY + RerollPanelLayout.BUTTON_H;
+		boolean hovered = rowHovered(layout, mouseX, mouseY, layout.buttonY, RerollPanelLayout.BUTTON_H);
 		if (running || canStart) {
 			GuiComponent.fill(poseStack, layout.x + RerollPanelLayout.PAD_X, layout.buttonY,
 					layout.x + layout.width - RerollPanelLayout.PAD_X,
@@ -854,7 +859,15 @@ public final class RerollPanel {
 			color = ACCENT_COLOR;
 			full = targetDetail(engine);
 		} else if (engine.stopReason() != null) {
-			String suffix = engine.rolls() > 0 ? " - " + engine.rolls() + " rolls" : "";
+			StringBuilder suffix = new StringBuilder();
+			if (engine.rolls() > 0) {
+				suffix.append(" - ").append(engine.rolls()).append(" rolls");
+			}
+			int resets = engine.potentialResetsThisSession();
+			if (resets > 0) {
+				suffix.append(suffix.length() == 0 ? " - " : ", ").append(resets)
+						.append(" potential reset").append(resets == 1 ? "" : "s");
+			}
 			boolean success = engine.stopReason() == StopReason.SUCCESS;
 			String reason = success && engine.stopCondition() == AutoRerollEngine.StopCondition.ALL
 					? "all targets met" : stopReasonText(engine.stopReason());
@@ -894,7 +907,7 @@ public final class RerollPanel {
 		if (text.length() > maxChars) {
 			text = truncate(text, maxChars);
 		}
-		if (mouseY >= layout.statusY && mouseY < layout.statusY + RerollPanelLayout.ROW_H && !full.equals(text)) {
+		if (rowHovered(layout, mouseX, mouseY, layout.statusY, RerollPanelLayout.ROW_H) && !full.equals(text)) {
 			hoverTooltip(full, mouseX, mouseY);
 		}
 		drawString(poseStack, text, layout.x + RerollPanelLayout.PAD_X, layout.statusY + 3, color);
