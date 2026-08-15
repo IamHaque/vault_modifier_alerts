@@ -8,14 +8,18 @@ import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelState;
 import iskallia.vault.client.gui.framework.element.ContainerElement;
+import iskallia.vault.client.gui.framework.element.spi.ITooltipElement;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
+import iskallia.vault.client.gui.framework.render.spi.ITooltipRenderer;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.gear.modification.GearModificationAction;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 
 import java.util.List;
 
@@ -24,7 +28,8 @@ import java.util.List;
  * scroll triangles and a scrollable list of items. Replaces the hand-drawn
  * {@code drawDropdown()} in {@link RerollPanel}.
  */
-public class DropdownListElement extends ContainerElement<DropdownListElement> {
+public class DropdownListElement extends ContainerElement<DropdownListElement>
+		implements ITooltipElement {
 
 	private VaultArtisanStationScreen screen;
 
@@ -148,9 +153,6 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 		int nameMax = x() + width() - RerollPanelLayout.PAD_X - rangeWidth - 8;
 		String fullName = name;
 		String shownName = RerollPanel.truncate(name, Math.max(8, (nameMax - x()) / 7));
-		if (!shownName.equals(fullName) && hovered) {
-			panel.hoverTooltip(fullName, mouseX, mouseY);
-		}
 		font.draw(poseStack, shownName, x() + 11, itemY + 3, baseColor);
 
 		if (!range.isEmpty() && !removeZone) {
@@ -308,6 +310,41 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 		int safeIndex = Math.min(state.operationIndex(), operations.size() - 1);
 		List<ModifierCatalog.Candidate> cands = panel.candidates(gear, operations.get(safeIndex));
 		return index < cands.size() && panel.isWatched(cands.get(index).id());
+	}
+
+	@Override
+	public boolean onHoverTooltip(ITooltipRenderer renderer, PoseStack poseStack,
+			int mouseX, int mouseY, TooltipFlag flag) {
+		RerollPanelState state = RerollPanelState.getInstance();
+		if (!isVisible() || mouseY < y() + RerollPanelLayout.DROPDOWN_HEADER_H) {
+			return false;
+		}
+		int slot = (mouseY - y() - RerollPanelLayout.DROPDOWN_HEADER_H) / RerollPanelLayout.DROPDOWN_ITEM_H;
+		RerollPanel panel = RerollPanel.getInstance();
+		RerollPanelLayout layout = panel.computeLayout(this.x(), this.y() - RerollPanelLayout.TITLE_H, this.width());
+		if (slot < 0 || slot >= layout.dropdownVisibleItems) {
+			return false;
+		}
+		int index = state.dropdownScroll() + slot;
+		if (index >= getItemCount()) {
+			return false;
+		}
+		String fullName = getItemName(index);
+		Font font = Minecraft.getInstance().font;
+		boolean operationDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION;
+		boolean targetDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS;
+		String range = getItemRange(index);
+		int rangeWidth = range.isEmpty() ? 0 : font.width(range);
+		int nameMax = x() + width() - RerollPanelLayout.PAD_X - rangeWidth - 8;
+		String shownName = RerollPanel.truncate(fullName, Math.max(8, (nameMax - x()) / 7));
+		if (!shownName.equals(fullName)) {
+			renderer.renderComponentTooltip(poseStack,
+					java.util.List.of(new TextComponent(fullName)),
+					mouseX, mouseY,
+					iskallia.vault.client.gui.framework.render.TooltipDirection.LEFT);
+			return true;
+		}
+		return false;
 	}
 
 	private static void drawTriangle(PoseStack poseStack, int centerX, int topY, boolean up, int color) {
