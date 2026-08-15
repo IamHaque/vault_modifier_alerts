@@ -108,15 +108,7 @@ public final class RerollPanel {
 		return dropdownMode != DropdownMode.NONE;
 	}
 
-	public DropdownMode dropdownMode() {
-		return dropdownMode;
-	}
-
-	public int operationIndex() {
-		return operationIndex;
-	}
-
-	public double thresholdValue() {
+	private double thresholdValue() {
 		RollTarget target = focused();
 		return target == null ? 0.0 : target.thresholdValue();
 	}
@@ -356,10 +348,10 @@ public final class RerollPanel {
 			dropdownMode = DropdownMode.NONE;
 		}
 		ItemStack gear = stationGear();
-		if (!ItemStack.matches(lastSeenGear, gear)) {
-			lastSeenGear = gear.copy();
+		if (lastSeenGear.isEmpty() && !gear.isEmpty()) {
 			resetSelection();
 		}
+		lastSeenGear = gear.copy();
 		clampSelections(operations, gear);
 		AutoRerollEngine engine = AutoRerollEngine.getInstance();
 		GearModificationAction operation = operations.isEmpty() ? null : operations.get(operationIndex);
@@ -1221,6 +1213,7 @@ public final class RerollPanel {
 			case MAX_ROLLS -> "max rolls";
 			case TIMEOUT -> "no roll detected";
 			case SCREEN_CLOSED -> "station closed";
+			case EVALUATION_ERROR -> "evaluation error";
 			case STOPPED -> "stopped";
 		};
 	}

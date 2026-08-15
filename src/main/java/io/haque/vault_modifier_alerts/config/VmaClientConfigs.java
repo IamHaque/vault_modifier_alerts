@@ -38,6 +38,7 @@ public final class VmaClientConfigs {
 
 	public static final ForgeConfigSpec.BooleanValue AUTO_REROLL_ENABLED;
 	public static final ForgeConfigSpec.IntValue AUTO_REROLL_TICK_INTERVAL;
+	public static final ForgeConfigSpec.IntValue AUTO_REROLL_ROLL_GAP_TICKS;
 	public static final ForgeConfigSpec.IntValue AUTO_REROLL_ROLL_TIMEOUT_TICKS;
 	public static final ForgeConfigSpec.IntValue AUTO_REROLL_MAX_ROLLS;
 	public static final ForgeConfigSpec.BooleanValue AUTO_REROLL_RESET_POTENTIAL;
@@ -81,7 +82,8 @@ public final class VmaClientConfigs {
 
 		builder.push("Auto Reroll");
 		AUTO_REROLL_ENABLED = builder.define("enabled", true);
-		AUTO_REROLL_TICK_INTERVAL = builder.defineInRange("tickInterval", 15, 4, 200);
+		AUTO_REROLL_TICK_INTERVAL = builder.defineInRange("tickInterval", 10, 4, 200);
+		AUTO_REROLL_ROLL_GAP_TICKS = builder.defineInRange("rollGapTicks", 4, 2, 40);
 		AUTO_REROLL_ROLL_TIMEOUT_TICKS = builder.defineInRange("rollTimeoutTicks", 60, 10, 400);
 		AUTO_REROLL_MAX_ROLLS = builder.defineInRange("maxRolls", 0, 0, Integer.MAX_VALUE);
 		AUTO_REROLL_RESET_POTENTIAL = builder.define("autoResetPotential", true);
@@ -149,6 +151,10 @@ public final class VmaClientConfigs {
 
 	public static int autoRerollTickInterval() {
 		return AUTO_REROLL_TICK_INTERVAL.get();
+	}
+
+	public static int autoRerollRollGapTicks() {
+		return AUTO_REROLL_ROLL_GAP_TICKS.get();
 	}
 
 	public static int autoRerollRollTimeoutTicks() {

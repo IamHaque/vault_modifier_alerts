@@ -20,7 +20,6 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * F3 auto-reroll state machine (see F3_AUTO_REROLL_PLAN.md). Runs on the client
@@ -33,7 +32,7 @@ public final class AutoRerollEngine {
 
 	public enum StopReason {
 		SUCCESS, NO_GEAR, OUT_OF_MATERIALS, OUT_OF_POTENTIAL, INVALID_TARGET, MAX_ROLLS, TIMEOUT, SCREEN_CLOSED,
-		STOPPED
+		EVALUATION_ERROR, STOPPED
 	}
 
 	public enum StopCondition {
@@ -51,6 +50,9 @@ public final class AutoRerollEngine {
 	 */
 	private static final double THRESHOLD_EPSILON = 0.005;
 
+	/** Every affix list on a gear; the stop condition judges the whole gear state, not the last roll's scope. */
+	private static final AffixType[] ALL_AFFIX_TYPES = { AffixType.IMPLICIT, AffixType.PREFIX, AffixType.SUFFIX };
+
 	private boolean running;
 	private boolean inFlight;
 	private int potentialResetsThisSession;
@@ -60,8 +62,12 @@ public final class AutoRerollEngine {
 	private boolean[] allPassed = new boolean[0];
 	private double[] lastRolledValues = new double[0];
 	private ItemStack lastPressedGear;
+	private ItemStack lastEvaluatedGear;
+	private ItemStack lastApplicabilityGear;
+	private boolean applicabilityOk;
 	private VaultArtisanStationContainer.Tab lastSelectedTab;
 	private long lastPressTick;
+	private int lastRollCompletedTick;
 	private int rolls;
 	private StopReason stopReason;
 
@@ -86,12 +92,15 @@ public final class AutoRerollEngine {
 		inFlight = false;
 		potentialResetsThisSession = 0;
 		lastPressedGear = null;
+		lastEvaluatedGear = null;
+		lastApplicabilityGear = null;
+		applicabilityOk = false;
 		lastSelectedTab = null;
 		lastPressTick = 0;
+		lastRollCompletedTick = 0;
 		rolls = 0;
 		stopReason = null;
-		VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll started: operation={}, targets={}, condition={}",
-				operation, targets, stopCondition);
+		logRoll("Auto-reroll started: operation={}, targets={}, condition={}", operation, targets, stopCondition);
 	}
 
 	public void stop(StopReason reason, boolean playSound) {
@@ -106,7 +115,15 @@ public final class AutoRerollEngine {
 			playStopSound(reason);
 		}
 		if (VmaClientConfigs.isDebugLogging()) {
-			VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll stopped: reason={}, rolls={}", reason, rolls);
+			StringBuilder values = new StringBuilder();
+			for (int i = 0; i < targets.size(); i++) {
+				if (i > 0) {
+					values.append(", ");
+				}
+				values.append(targets.get(i).id()).append('=').append(formatRollValue(lastRolledValues[i]));
+			}
+			VaultModifierAlerts.LOGGER.info("[VMA] Auto-reroll stopped: reason={}, rolls={}, values=[{}]", reason,
+					rolls, values);
 		}
 	}
 
@@ -143,11 +160,9 @@ public final class AutoRerollEngine {
 		if (inFlight) {
 			if (gearChanged(gear)) {
 				inFlight = false;
-				if (targetRolled(gear)) {
-					stop(StopReason.SUCCESS, true);
-					return;
-				}
+				lastRollCompletedTick = mc.player.tickCount;
 			} else if (mc.player.tickCount - lastPressTick > VmaClientConfigs.autoRerollRollTimeoutTicks()) {
+				logRoll("roll #%d timeout after %d ticks", rolls, VmaClientConfigs.autoRerollRollTimeoutTicks());
 				stop(StopReason.TIMEOUT, true);
 				return;
 			} else {
@@ -155,7 +170,27 @@ public final class AutoRerollEngine {
 			}
 		}
 
+		if (gearChangedSince(lastEvaluatedGear, gear)) {
+			lastEvaluatedGear = gear.copy();
+			try {
+				boolean qualified = targetRolled(gear);
+				logRoll("roll #%d result: %s met %d/%d", rolls, stopCondition, metCount(), targets.size());
+				if (qualified) {
+					stop(StopReason.SUCCESS, true);
+					return;
+				}
+			} catch (Throwable t) {
+				VaultModifierAlerts.LOGGER.error("[VMA] Roll evaluation failed", t);
+				stop(StopReason.EVALUATION_ERROR, true);
+				return;
+			}
+		}
+
 		if (mc.player.tickCount - lastPressTick < VmaClientConfigs.autoRerollTickInterval()) {
+			return;
+		}
+		if (lastRollCompletedTick > 0
+				&& mc.player.tickCount - lastRollCompletedTick < VmaClientConfigs.autoRerollRollGapTicks()) {
 			return;
 		}
 
@@ -169,8 +204,13 @@ public final class AutoRerollEngine {
 			return;
 		}
 
-		OperationScope scope = ModifierCatalog.scopeOfOperation(operationId);
-		if (scope == null || targets.stream().noneMatch(t -> ModifierCatalog.isApplicable(gear, t.id(), scope))) {
+		if (lastApplicabilityGear == null || !ItemStack.matches(lastApplicabilityGear, gear)) {
+			lastApplicabilityGear = gear.copy();
+			OperationScope scope = ModifierCatalog.scopeOfOperation(operationId);
+			applicabilityOk = scope != null
+					&& targets.stream().anyMatch(t -> ModifierCatalog.isApplicable(gear, t.id(), scope));
+		}
+		if (!applicabilityOk) {
 			stop(StopReason.INVALID_TARGET, true);
 			return;
 		}
@@ -198,11 +238,6 @@ public final class AutoRerollEngine {
 		return operationId;
 	}
 
-	/** The first watched target id (convenience; the run may watch several). */
-	public ResourceLocation targetId() {
-		return targets.isEmpty() ? null : targets.get(0).id();
-	}
-
 	public List<RollTarget> targets() {
 		return targets;
 	}
@@ -222,11 +257,6 @@ public final class AutoRerollEngine {
 	/** Times crafting potential was auto-reset during the current run. */
 	public int potentialResetsThisSession() {
 		return potentialResetsThisSession;
-	}
-
-	/** The most recent roll value of the first target seen during the current run (0 before any roll). */
-	public double lastTargetValue() {
-		return currentValue(0);
 	}
 
 	/** The most recent roll value of the target at the given index (0 before any roll). */
@@ -263,6 +293,8 @@ public final class AutoRerollEngine {
 			lastPressTick = mc.player.tickCount;
 			if (countsAsRoll) {
 				rolls++;
+				logRoll("roll #%d press: %s (potential %d)", rolls, action.modification().getRegistryName(),
+						ModifierCatalog.craftingPotential(gear));
 			}
 			inFlight = true;
 			accessor.vma$triggerAction(action);
@@ -285,6 +317,7 @@ public final class AutoRerollEngine {
 			return;
 		}
 		potentialResetsThisSession++;
+		logRoll("roll #%d potential reset #%d", rolls + 1, potentialResetsThisSession);
 		press(station, resetAction, gear, false);
 	}
 
@@ -313,18 +346,28 @@ public final class AutoRerollEngine {
 		return lastPressedGear == null || !ItemStack.matches(lastPressedGear, gear);
 	}
 
+	private static boolean gearChangedSince(ItemStack last, ItemStack current) {
+		return last == null || !ItemStack.matches(last, current);
+	}
+
+	/**
+	 * Whether the current gear state satisfies the stop condition. Judges the
+	 * whole gear (base/implicits, prefixes, suffixes) - never only what the last
+	 * press re-rolled - so a gear that visibly meets the watched targets stops
+	 * the run no matter which operation produced it.
+	 */
 	private boolean targetRolled(ItemStack gear) {
 		if (targets.isEmpty() || gear.isEmpty() || !(gear.getItem() instanceof iskallia.vault.gear.item.VaultGearItem)) {
 			return false;
 		}
-		// Every station press re-rolls the whole operation scope, so the ALL
+		// Every station press re-rolls its operation scope, so the ALL
 		// condition must be judged against the current gear state only - never
 		// carry pass flags from earlier rolls.
 		Arrays.fill(allPassed, false);
 		Arrays.fill(lastRolledValues, 0.0);
 		VaultGearData data = VaultGearData.read(gear);
 		boolean all = stopCondition == StopCondition.ALL;
-		for (AffixType affixType : scopeAffixes(ModifierCatalog.scopeOfOperation(operationId))) {
+		for (AffixType affixType : ALL_AFFIX_TYPES) {
 			for (VaultGearModifier<?> modifier : data.getModifiers(affixType)) {
 				int index = indexOfTarget(modifier.getModifierIdentifier());
 				if (index < 0) {
@@ -335,8 +378,9 @@ public final class AutoRerollEngine {
 				boolean passed = !target.thresholdEnabled()
 						|| displayValue + THRESHOLD_EPSILON >= target.thresholdValue();
 				lastRolledValues[index] = displayValue;
-				VaultModifierAlerts.LOGGER.debug("[VMA] Rolled target={} value={}, threshold={}, passed={}",
-						target.id(), displayValue, target.thresholdEnabled() ? target.thresholdValue() : null, passed);
+				logRoll("roll #%d target=%s group=%s value=%s threshold=%s passed=%s", rolls, target.id(),
+						groupName(affixType), formatRollValue(displayValue),
+						target.thresholdEnabled() ? formatRollValue(target.thresholdValue()) : null, passed);
 				if (all) {
 					if (passed) {
 						allPassed[index] = true;
@@ -366,16 +410,28 @@ public final class AutoRerollEngine {
 		return -1;
 	}
 
-	private static AffixType[] scopeAffixes(OperationScope scope) {
-		if (scope == null) {
-			return new AffixType[0];
-		}
-		return switch (scope) {
-			case PREFIX -> new AffixType[] { AffixType.PREFIX };
-			case SUFFIX -> new AffixType[] { AffixType.SUFFIX };
-			case IMPLICIT -> new AffixType[] { AffixType.IMPLICIT };
-			case PREFIX_SUFFIX -> new AffixType[] { AffixType.PREFIX, AffixType.SUFFIX };
+	private static String groupName(AffixType affixType) {
+		return switch (affixType) {
+			case IMPLICIT -> "BASE";
+			case PREFIX -> "PREFIX";
+			case SUFFIX -> "SUFFIX";
 		};
+	}
+
+	/** Display units without trailing zeros ("25", "10.5"). */
+	private static String formatRollValue(double value) {
+		if (value == Math.rint(value)) {
+			return String.valueOf((long) value);
+		}
+		String text = String.format("%.2f", value);
+		return text.replaceAll("0$", "").replaceAll("\\.$", "");
+	}
+
+	/** INFO-level roll log, only visible with debug logging enabled (production latest.log). */
+	private void logRoll(String format, Object... args) {
+		if (VmaClientConfigs.isDebugLogging()) {
+			VaultModifierAlerts.LOGGER.info("[VMA] " + format, args);
+		}
 	}
 
 	private static void playStopSound(StopReason reason) {

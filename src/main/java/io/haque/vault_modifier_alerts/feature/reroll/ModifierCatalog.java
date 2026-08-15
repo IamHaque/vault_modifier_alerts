@@ -98,10 +98,6 @@ public final class ModifierCatalog {
 		return null;
 	}
 
-	public static boolean isRerollOperation(ResourceLocation operationId) {
-		return scopeOfOperation(operationId) != null;
-	}
-
 	public static List<Candidate> candidates(ItemStack gear, OperationScope scope) {
 		if (gear == null || gear.isEmpty() || scope == null) {
 			return List.of();
