@@ -2,19 +2,22 @@ package io.haque.vault_modifier_alerts.feature.reroll.ui;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout;
+import iskallia.vault.client.gui.framework.ScreenTextures;
 import iskallia.vault.client.gui.framework.element.spi.AbstractSpatialElement;
 import iskallia.vault.client.gui.framework.element.spi.IGuiEventElement;
 import iskallia.vault.client.gui.framework.element.spi.IRenderedElement;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
-import net.minecraft.client.Minecraft;
+import iskallia.vault.client.atlas.TextureAtlasRegion;
 import net.minecraft.client.gui.GuiComponent;
 
 import java.util.function.Supplier;
 
 /**
- * A toggle row element: checkbox-style toggle on the left, label on the right.
- * Replaces the hand-drawn {@code drawToggleRow()} in {@link io.haque.vault_modifier_alerts.feature.reroll.RerollPanel}.
+ * A toggle row element using the host's atlas toggle icons
+ * ({@code BUTTON_TOGGLE_ON}/{@code BUTTON_TOGGLE_OFF}) on the left,
+ * label on the right. Replaces the hand-drawn {@code drawToggleRow()}
+ * in {@link io.haque.vault_modifier_alerts.feature.reroll.RerollPanel}.
  */
 public class ToggleRowElement extends AbstractSpatialElement<ToggleRowElement>
 		implements IRenderedElement, IGuiEventElement {
@@ -47,11 +50,12 @@ public class ToggleRowElement extends AbstractSpatialElement<ToggleRowElement>
 			GuiComponent.fill(poseStack, x(), y(), x() + width(),
 					y() + height(), RerollTokens.ROW_HOVER);
 		}
-		net.minecraft.client.gui.Font font = Minecraft.getInstance().font;
-		font.draw(poseStack, "[" + (enabled ? "x" : " ") + "]",
-				x() + RerollPanelLayout.PAD_X, y() + 3,
-				enabled ? RerollTokens.STATE_SUCCESS : RerollTokens.TEXT_DISABLED);
-		font.draw(poseStack, label, x() + 30, y() + 3,
+		TextureAtlasRegion icon = enabled
+				? (hovered ? ScreenTextures.BUTTON_TOGGLE_ON_HOVER : ScreenTextures.BUTTON_TOGGLE_ON)
+				: (hovered ? ScreenTextures.BUTTON_TOGGLE_OFF_HOVER : ScreenTextures.BUTTON_TOGGLE_OFF);
+		icon.blit(poseStack, x() + RerollPanelLayout.PAD_X, y() + 1);
+		net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
+		font.draw(poseStack, label, x() + 26, y() + 3,
 				enabled ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED);
 	}
 
