@@ -1,30 +1,28 @@
 package io.haque.vault_modifier_alerts.feature.reroll;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import iskallia.vault.client.gui.framework.element.spi.AbstractSpatialElement;
-import iskallia.vault.client.gui.framework.element.spi.IGuiEventElement;
-import iskallia.vault.client.gui.framework.element.spi.IRenderedElement;
+import iskallia.vault.client.gui.framework.element.ContainerElement;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import net.minecraft.util.Mth;
 
 /**
- * The auto-reroll panel as a real VH framework element. Anchored left of the
- * artisan station window (right side fallback when there is no space); when
- * neither side has room the panel shrinks toward
+ * The auto-reroll panel as a real VH framework element container. Anchored
+ * left of the artisan station window (right side fallback when there is no
+ * space); when neither side has room the panel shrinks toward
  * {@link RerollPanelLayout#MIN_WIDTH} instead of overlapping at full width.
  *
- * The framework renders elements <em>before</em> slot items, so this element
- * draws the panel itself (guaranteeing it is visible) and the mixin re-draws
- * it at the TAIL of the screen render, above slot items and tooltips. The
- * second pass paints the same pixels, so the double draw is invisible; it only
- * matters when slot items overlap the panel. The element also re-syncs its
- * height/width through the framework layout pass. All model, rendering and hit
- * logic lives in {@link RerollPanel}.
+ * <p>This element extends {@link ContainerElement} so child elements (row
+ * widgets, buttons, labels) can be added incrementally. The panel frame and
+ * unconverted rows are still drawn by {@link RerollPanel#draw}; converted rows
+ * are rendered as real framework children by the container's own render pass.</p>
+ *
+ * <p>The mixin re-draws the panel at the TAIL of the screen render, above slot
+ * items and tooltips. The second pass paints the same pixels, so the double draw
+ * is invisible; it only matters when slot items overlap the panel.</p>
  */
-public final class RerollPanelElement extends AbstractSpatialElement<RerollPanelElement>
-		implements IRenderedElement, IGuiEventElement {
+public final class RerollPanelElement extends ContainerElement<RerollPanelElement> {
 
 	private static final int MARGIN = RerollPanelLayout.MARGIN;
 
@@ -82,6 +80,7 @@ public final class RerollPanelElement extends AbstractSpatialElement<RerollPanel
 			return;
 		}
 		panel.draw(screen, poseStack, x(), y(), width(), height(), mouseX, mouseY);
+		super.render(renderer, poseStack, mouseX, mouseY, partialTick);
 		syncSize(panel);
 	}
 
@@ -92,6 +91,9 @@ public final class RerollPanelElement extends AbstractSpatialElement<RerollPanel
 			return false;
 		}
 		syncSize(panel);
+		if (super.onMouseClicked(mouseX, mouseY, button)) {
+			return true;
+		}
 		if (!panel.hitTest(x(), y(), width(), height(), (int) mouseX, (int) mouseY)) {
 			return false;
 		}
