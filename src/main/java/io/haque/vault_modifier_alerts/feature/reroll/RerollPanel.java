@@ -55,6 +55,13 @@ public final class RerollPanel {
 	private int tooltipX;
 	private int tooltipY;
 
+	// Status debounce (Phase 5.3): cache status and only update after
+	// STATUS_DEBOUNCE_TICKS consecutive frames with the same text
+	private static final int STATUS_DEBOUNCE_TICKS = 4;
+	private StatusInfo cachedStatus;
+	private int statusStableTicks;
+	private StatusInfo displayedStatus;
+
 	private RerollPanel() {
 		state.setPanel(this);
 	}
@@ -884,6 +891,16 @@ public final class RerollPanel {
 			color = RerollTokens.STATE_SUCCESS;
 			full = targetDetail(engine);
 		}
-		return new StatusInfo(text, color, full);
+		StatusInfo fresh = new StatusInfo(text, color, full);
+		if (cachedStatus == null || !cachedStatus.text().equals(fresh.text()) || cachedStatus.color() != fresh.color()) {
+			cachedStatus = fresh;
+			statusStableTicks = 0;
+		} else {
+			statusStableTicks++;
+		}
+		if (displayedStatus == null || statusStableTicks >= STATUS_DEBOUNCE_TICKS) {
+			displayedStatus = fresh;
+		}
+		return displayedStatus;
 	}
 }
