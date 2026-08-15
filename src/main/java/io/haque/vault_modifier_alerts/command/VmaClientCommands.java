@@ -6,6 +6,7 @@ import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.order.ModifierOrdering;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine.StopReason;
+import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
 import io.haque.vault_modifier_alerts.tracker.ModifierTracker;
 import net.minecraft.commands.CommandSourceStack;
@@ -65,9 +66,21 @@ public final class VmaClientCommands {
 			return 0;
 		}
 		engine.start(selection.operationId(), selection.targets(), selection.stopCondition());
+		StringBuilder detail = new StringBuilder();
+		for (int i = 0; i < selection.targets().size(); i++) {
+			ModifierCatalog.RollTarget target = selection.targets().get(i);
+			if (i > 0) {
+				detail.append(", ");
+			}
+			detail.append(ModifierCatalog.humanizeId(ModifierCatalog.stripModPrefix(target.id().getPath())));
+			if (target.thresholdEnabled()) {
+				detail.append(" >=").append(RerollPanel.formatDisplay(target.thresholdValue(), false));
+			} else {
+				detail.append(" any");
+			}
+		}
 		source.sendSuccess(new TextComponent("[VMA] Auto-reroll started: " + selection.operationId() + " -> "
-				+ selection.targets().size() + " target(s)" + (selection.stopCondition() == AutoRerollEngine.StopCondition.ALL
-						? " (all)" : "")), false);
+				+ detail + (selection.stopCondition() == AutoRerollEngine.StopCondition.ALL ? " (all)" : "")), false);
 		return Command.SINGLE_SUCCESS;
 	}
 

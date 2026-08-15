@@ -18,6 +18,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,20 +42,28 @@ public final class AutoRerollEngine {
 
 	private static final AutoRerollEngine INSTANCE = new AutoRerollEngine();
 
+	/**
+	 * Comparison tolerance in display units. Roll values are stored as raw
+	 * doubles (percent attributes as fractions of 1), so an exact "5.0" roll can
+	 * arrive as 4.99999999... after the display-unit conversion; the panel also
+	 * rounds to two decimals. 0.005 = half of that rounding step, so a roll the
+	 * panel displays as the threshold counts as met.
+	 */
+	private static final double THRESHOLD_EPSILON = 0.005;
+
 	private boolean running;
 	private boolean inFlight;
-	private boolean resetUsedThisSession;
 	private int potentialResetsThisSession;
 	private ResourceLocation operationId;
 	private List<RollTarget> targets = List.of();
 	private StopCondition stopCondition = StopCondition.ANY;
 	private boolean[] allPassed = new boolean[0];
+	private double[] lastRolledValues = new double[0];
 	private ItemStack lastPressedGear;
 	private VaultArtisanStationContainer.Tab lastSelectedTab;
 	private long lastPressTick;
 	private int rolls;
 	private StopReason stopReason;
-	private double lastTargetValue;
 
 	private AutoRerollEngine() {
 	}
@@ -72,16 +81,15 @@ public final class AutoRerollEngine {
 		targets = List.copyOf(rollTargets);
 		stopCondition = condition == null ? StopCondition.ANY : condition;
 		allPassed = new boolean[targets.size()];
+		lastRolledValues = new double[targets.size()];
 		running = true;
 		inFlight = false;
-		resetUsedThisSession = false;
 		potentialResetsThisSession = 0;
 		lastPressedGear = null;
 		lastSelectedTab = null;
 		lastPressTick = 0;
 		rolls = 0;
 		stopReason = null;
-		lastTargetValue = 0.0;
 		VaultModifierAlerts.LOGGER.debug("[VMA] Auto-reroll started: operation={}, targets={}, condition={}",
 				operation, targets, stopCondition);
 	}
@@ -174,7 +182,7 @@ public final class AutoRerollEngine {
 		}
 
 		if (action.canApply(container, mc.player)) {
-			press(station, action, gear);
+			press(station, action, gear, true);
 		} else if (isOutOfPotential(gear, action)) {
 			handleOutOfPotential(station, container, gear);
 		} else {
@@ -216,12 +224,34 @@ public final class AutoRerollEngine {
 		return potentialResetsThisSession;
 	}
 
-	/** The most recent roll value of the target modifier seen during the current run (0 before any roll). */
+	/** The most recent roll value of the first target seen during the current run (0 before any roll). */
 	public double lastTargetValue() {
-		return lastTargetValue;
+		return currentValue(0);
 	}
 
-	private void press(VaultArtisanStationScreen station, GearModificationAction action, ItemStack gear) {
+	/** The most recent roll value of the target at the given index (0 before any roll). */
+	public double currentValue(int index) {
+		return index >= 0 && index < lastRolledValues.length ? lastRolledValues[index] : 0.0;
+	}
+
+	/** Whether the target at the given index met its threshold on the last roll evaluation. */
+	public boolean isMet(int index) {
+		return index >= 0 && index < allPassed.length && allPassed[index];
+	}
+
+	/** How many targets met their threshold on the last roll evaluation. */
+	public int metCount() {
+		int count = 0;
+		for (boolean passed : allPassed) {
+			if (passed) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	private void press(VaultArtisanStationScreen station, GearModificationAction action, ItemStack gear,
+			boolean countsAsRoll) {
 		Minecraft mc = Minecraft.getInstance();
 		if (station instanceof ArtisanStationScreenAccessor accessor) {
 			VaultArtisanStationContainer.Tab tab = action.tab();
@@ -231,7 +261,9 @@ public final class AutoRerollEngine {
 			}
 			lastPressedGear = gear.copy();
 			lastPressTick = mc.player.tickCount;
-			rolls++;
+			if (countsAsRoll) {
+				rolls++;
+			}
 			inFlight = true;
 			accessor.vma$triggerAction(action);
 		} else {
@@ -242,7 +274,7 @@ public final class AutoRerollEngine {
 	private void handleOutOfPotential(VaultArtisanStationScreen station, VaultArtisanStationContainer container,
 			ItemStack gear) {
 		Minecraft mc = Minecraft.getInstance();
-		if (!VmaClientConfigs.isAutoResetPotentialEnabled() || resetUsedThisSession) {
+		if (!VmaClientConfigs.isAutoResetPotentialEnabled()) {
 			stop(StopReason.OUT_OF_POTENTIAL, true);
 			return;
 		}
@@ -252,9 +284,8 @@ public final class AutoRerollEngine {
 			stop(StopReason.OUT_OF_POTENTIAL, true);
 			return;
 		}
-		resetUsedThisSession = true;
 		potentialResetsThisSession++;
-		press(station, resetAction, gear);
+		press(station, resetAction, gear, false);
 	}
 
 	private static boolean isOutOfPotential(ItemStack gear, GearModificationAction action) {
@@ -286,6 +317,11 @@ public final class AutoRerollEngine {
 		if (targets.isEmpty() || gear.isEmpty() || !(gear.getItem() instanceof iskallia.vault.gear.item.VaultGearItem)) {
 			return false;
 		}
+		// Every station press re-rolls the whole operation scope, so the ALL
+		// condition must be judged against the current gear state only - never
+		// carry pass flags from earlier rolls.
+		Arrays.fill(allPassed, false);
+		Arrays.fill(lastRolledValues, 0.0);
 		VaultGearData data = VaultGearData.read(gear);
 		boolean all = stopCondition == StopCondition.ALL;
 		for (AffixType affixType : scopeAffixes(ModifierCatalog.scopeOfOperation(operationId))) {
@@ -296,8 +332,9 @@ public final class AutoRerollEngine {
 				}
 				double displayValue = ModifierCatalog.toDisplayUnits(modifier);
 				RollTarget target = targets.get(index);
-				boolean passed = !target.thresholdEnabled() || displayValue >= target.thresholdValue();
-				lastTargetValue = displayValue;
+				boolean passed = !target.thresholdEnabled()
+						|| displayValue + THRESHOLD_EPSILON >= target.thresholdValue();
+				lastRolledValues[index] = displayValue;
 				VaultModifierAlerts.LOGGER.debug("[VMA] Rolled target={} value={}, threshold={}, passed={}",
 						target.id(), displayValue, target.thresholdEnabled() ? target.thresholdValue() : null, passed);
 				if (all) {

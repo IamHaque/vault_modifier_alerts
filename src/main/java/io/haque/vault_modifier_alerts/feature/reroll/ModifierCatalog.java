@@ -205,7 +205,14 @@ public final class ModifierCatalog {
 		}
 		VaultGearAttribute<?> attribute = modifier.getAttribute();
 		boolean percent = attribute != null && isPercentType(attribute);
-		return percent ? number.doubleValue() * 100.0 : number.doubleValue();
+		// Fraction-based percentage attributes (Float/Double generators) store
+		// 0.02-0.06 for 2-6%; integer-percent attributes already store display
+		// units. Mirrors the scale rule in rollRange so range, display and the
+		// threshold comparison all use the same units.
+		boolean fractionBased = attribute != null
+				&& (attribute.getGenerator() instanceof FloatAttributeGenerator
+						|| attribute.getGenerator() instanceof DoubleAttributeGenerator);
+		return percent && fractionBased ? number.doubleValue() * 100.0 : number.doubleValue();
 	}
 
 	/**

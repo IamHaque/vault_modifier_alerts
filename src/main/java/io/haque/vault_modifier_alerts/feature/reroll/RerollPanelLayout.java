@@ -8,7 +8,10 @@ package io.haque.vault_modifier_alerts.feature.reroll;
  */
 public final class RerollPanelLayout {
 
+	/** Full-width panel; shrinks toward {@link #MIN_WIDTH} when no side room beside the station window. */
 	public static final int WIDTH = 216;
+	public static final int MIN_WIDTH = 160;
+	public static final int MARGIN = 22;
 	public static final int PAD_X = 8;
 
 	public static final int TITLE_H = 18;
@@ -23,8 +26,8 @@ public final class RerollPanelLayout {
 	public static final int MAX_DROPDOWN_ROWS = 8;
 
 	public enum HitType {
-		NONE, FOCUS_ROW, MODIFIER_ROW, TARGETS_ROW, TARGETS_CHIP, MIN_DEC, MIN_FIELD, MIN_INC, REROLL_TOGGLE,
-		RESET_TOGGLE, START_BUTTON, DROPDOWN_UP, DROPDOWN_DOWN, DROPDOWN_ITEM
+		NONE, FOCUS_ROW, MODIFIER_ROW, TARGETS_ROW, TARGETS_CHIP, TARGETS_CLEAR, MIN_DEC, MIN_FIELD, MIN_INC,
+		REROLL_TOGGLE, RESET_TOGGLE, START_BUTTON, DROPDOWN_UP, DROPDOWN_DOWN, DROPDOWN_ITEM
 	}
 
 	public record Hit(HitType type, int index) {
@@ -33,6 +36,7 @@ public final class RerollPanelLayout {
 
 	public final int x;
 	public final int y;
+	public final int width;
 	public final int baseHeight;
 	public final int dropdownVisibleItems;
 	public final int dropdownHeight;
@@ -53,10 +57,11 @@ public final class RerollPanelLayout {
 	public final int dropdownY;
 	public final int dropdownEnd;
 
-	public RerollPanelLayout(int x, int y, boolean dropdownOpen, int dropdownCount, int dropdownScroll,
+	public RerollPanelLayout(int x, int y, int width, boolean dropdownOpen, int dropdownCount, int dropdownScroll,
 			int maxDropdownRows) {
 		this.x = x;
 		this.y = y;
+		this.width = Math.max(MIN_WIDTH, width);
 
 		titleBottom = y + TITLE_H;
 		focusY = titleBottom;
@@ -88,7 +93,7 @@ public final class RerollPanelLayout {
 	}
 
 	public int minFieldRight() {
-		return x + 184;
+		return Math.min(x + 184, x + width - 18);
 	}
 
 	public record Rect(int x, int y, int width, int height) {
@@ -99,7 +104,7 @@ public final class RerollPanelLayout {
 		if (dropdownVisibleItems == 0 || visibleIndex < 0 || visibleIndex >= dropdownVisibleItems) {
 			return null;
 		}
-		return new Rect(x, dropdownY + DROPDOWN_HEADER_H + visibleIndex * DROPDOWN_ITEM_H, WIDTH, DROPDOWN_ITEM_H);
+		return new Rect(x, dropdownY + DROPDOWN_HEADER_H + visibleIndex * DROPDOWN_ITEM_H, width, DROPDOWN_ITEM_H);
 	}
 
 	/**
@@ -116,7 +121,7 @@ public final class RerollPanelLayout {
 				if (mouseX < x + 14) {
 					return new Hit(HitType.DROPDOWN_UP, -1);
 				}
-				if (mouseX >= x + WIDTH - 14) {
+				if (mouseX >= x + width - 14) {
 					return new Hit(HitType.DROPDOWN_DOWN, -1);
 				}
 				return new Hit(HitType.NONE, -1);
@@ -134,8 +139,11 @@ public final class RerollPanelLayout {
 			return new Hit(HitType.MODIFIER_ROW, -1);
 		}
 		if (inside(mouseY, targetsY, ROW_H)) {
-			if (mouseX >= x + WIDTH - 24) {
+			if (mouseX >= x + width - 24) {
 				return new Hit(HitType.TARGETS_CHIP, -1);
+			}
+			if (mouseX >= x + width - 44) {
+				return new Hit(HitType.TARGETS_CLEAR, -1);
 			}
 			return new Hit(HitType.TARGETS_ROW, -1);
 		}
@@ -143,7 +151,7 @@ public final class RerollPanelLayout {
 			if (mouseX < x + 16) {
 				return new Hit(HitType.MIN_DEC, -1);
 			}
-			if (mouseX >= x + WIDTH - 16) {
+			if (mouseX >= x + width - 16) {
 				return new Hit(HitType.MIN_INC, -1);
 			}
 			if (mouseX >= minFieldLeft() && mouseX < minFieldRight()) {

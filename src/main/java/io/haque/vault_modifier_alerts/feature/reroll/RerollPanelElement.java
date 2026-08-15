@@ -11,30 +11,39 @@ import net.minecraft.util.Mth;
 
 /**
  * The auto-reroll panel as a real VH framework element. Anchored left of the
- * artisan station window (right side fallback when there is no space), drawn
- * and click-routed natively by the framework's element pipeline. The panel
- * grows when a selection dropdown is open, so the element's own height is
- * re-synced (with a layout pass) whenever that happens. All model, rendering
+ * artisan station window (right side fallback when there is no space); when
+ * neither side has room the panel shrinks toward
+ * {@link RerollPanelLayout#MIN_WIDTH} instead of overlapping at full width.
+ *
+ * The framework renders elements <em>before</em> slot items, so this element
+ * does NOT draw itself - the mixin draws the panel at the TAIL of the screen
+ * render, above slot items and tooltips. The element stays registered so the
+ * framework keeps routing clicks to {@link RerollPanel#handleClick}, and its
+ * height/width re-sync drives the framework layout pass. All model, rendering
  * and hit logic lives in {@link RerollPanel}.
  */
 public final class RerollPanelElement extends AbstractSpatialElement<RerollPanelElement>
 		implements IRenderedElement, IGuiEventElement {
 
-	private static final int MARGIN = 22;
+	private static final int MARGIN = RerollPanelLayout.MARGIN;
+
+	private static RerollPanelElement instance;
 
 	private final VaultArtisanStationScreen screen;
 	private int lastHeight;
+	private int lastWidth;
 
 	private RerollPanelElement(VaultArtisanStationScreen screen) {
 		super(Spatials.size(RerollPanelLayout.WIDTH, RerollPanel.getInstance().currentHeight()));
 		this.screen = screen;
 		this.lastHeight = height();
+		this.lastWidth = width();
 	}
 
 	public static RerollPanelElement create(VaultArtisanStationScreen screen) {
-		RerollPanelElement element = new RerollPanelElement(screen);
-		element.layout((screenSize, gui, parent, world) -> {
-			int width = RerollPanelLayout.WIDTH;
+		instance = new RerollPanelElement(screen);
+		instance.layout((screenSize, gui, parent, world) -> {
+			int width = RerollPanel.computeWidth(screenSize.width(), gui.left(), gui.right());
 			int panelHeight = RerollPanel.getInstance().currentHeight();
 			int x = gui.left() - MARGIN - width;
 			if (x < 0) {
@@ -43,8 +52,16 @@ public final class RerollPanelElement extends AbstractSpatialElement<RerollPanel
 			x = Mth.clamp(x, 0, Math.max(0, screenSize.width() - width - MARGIN));
 			int y = Mth.clamp(gui.top() + 16, 4, Math.max(4, screenSize.height() - panelHeight - 4));
 			world.positionXY(x, y);
+			if (width != instance.width()) {
+				instance.setWidth(width);
+			}
 		});
-		return element;
+		return instance;
+	}
+
+	/** The element registered on the current station screen (null until one is open). */
+	public static RerollPanelElement getInstance() {
+		return instance;
 	}
 
 	@Override
@@ -63,8 +80,7 @@ public final class RerollPanelElement extends AbstractSpatialElement<RerollPanel
 		if (!panel.isVisible()) {
 			return;
 		}
-		syncHeight(panel);
-		panel.draw(screen, poseStack, x(), y(), width(), height(), mouseX, mouseY);
+		syncSize(panel);
 	}
 
 	@Override
@@ -73,17 +89,18 @@ public final class RerollPanelElement extends AbstractSpatialElement<RerollPanel
 		if (!panel.isVisible()) {
 			return false;
 		}
-		syncHeight(panel);
+		syncSize(panel);
 		if (!panel.hitTest(x(), y(), width(), height(), (int) mouseX, (int) mouseY)) {
 			return false;
 		}
 		return panel.handleClick(screen, x(), y(), width(), height(), (int) mouseX, (int) mouseY, button);
 	}
 
-	private void syncHeight(RerollPanel panel) {
+	private void syncSize(RerollPanel panel) {
 		int height = panel.currentHeight();
-		if (height != lastHeight) {
+		if (height != lastHeight || width() != lastWidth) {
 			lastHeight = height;
+			lastWidth = width();
 			setHeight(height);
 			screen.requestLayout();
 		}
