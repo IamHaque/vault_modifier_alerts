@@ -27,7 +27,7 @@ public final class RerollPanelLayout {
 
 	public 	enum HitType {
 		NONE, FOCUS_ROW, MODIFIER_ROW, TARGETS_ROW, TARGETS_CHIP, TARGETS_CLEAR, MIN_DEC, MIN_FIELD, MIN_INC,
-		REROLL_TOGGLE, RESET_TOGGLE, DROPDOWN_UP, DROPDOWN_DOWN, DROPDOWN_ITEM
+		REROLL_TOGGLE, RESET_TOGGLE
 	}
 
 	public record Hit(HitType type, int index) {
@@ -117,19 +117,6 @@ public final class RerollPanelLayout {
 			return Hit.MISS;
 		}
 		if (mouseY >= dropdownY) {
-			if (mouseY < dropdownY + DROPDOWN_HEADER_H) {
-				if (mouseX < x + 14) {
-					return new Hit(HitType.DROPDOWN_UP, -1);
-				}
-				if (mouseX >= x + width - 14) {
-					return new Hit(HitType.DROPDOWN_DOWN, -1);
-				}
-				return new Hit(HitType.NONE, -1);
-			}
-			int slot = (mouseY - dropdownY - DROPDOWN_HEADER_H) / DROPDOWN_ITEM_H;
-			if (slot >= 0 && slot < dropdownVisibleItems) {
-				return new Hit(HitType.DROPDOWN_ITEM, slot);
-			}
 			return Hit.MISS;
 		}
 		if (inside(mouseY, focusY, ROW_H)) {

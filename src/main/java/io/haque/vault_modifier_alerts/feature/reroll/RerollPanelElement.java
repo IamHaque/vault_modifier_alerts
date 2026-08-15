@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.CounterRowElement;
+import io.haque.vault_modifier_alerts.feature.reroll.ui.DropdownListElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StartStopButtonElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StatusRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.ToggleRowElement;
@@ -155,6 +156,10 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 			world.width(parent.width());
 		});
 		instance.addElement(counterRow);
+
+		// Dropdown list
+		DropdownListElement dropdown = DropdownListElement.create(screen);
+		instance.addElement(dropdown);
 
 		return instance;
 	}
