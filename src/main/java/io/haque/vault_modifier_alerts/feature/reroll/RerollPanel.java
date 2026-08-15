@@ -321,7 +321,6 @@ public final class RerollPanel {
 
 		if (operation == null) {
 			drawString(poseStack, "No re-roll actions", x + RerollPanelLayout.PAD_X, layout.focusY + 3, RerollTokens.STATE_DANGER);
-			drawStatus(poseStack, layout, candidates.isEmpty(), mouseX, mouseY);
 			drawTooltip(poseStack);
 			return;
 		}
@@ -333,7 +332,6 @@ public final class RerollPanel {
 		drawMinRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawRangeRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawPotentialRow(poseStack, layout, x, width, operation);
-		drawStatus(poseStack, layout, candidates.isEmpty(), mouseX, mouseY);
 		drawCounterRow(poseStack, layout, engine);
 
 		if (state.isDropdownOpen()) {
@@ -604,81 +602,8 @@ public final class RerollPanel {
 		}
 	}
 
-	private void drawStatus(PoseStack poseStack, RerollPanelLayout layout, boolean noCandidates, int mouseX,
-			int mouseY) {
-		AutoRerollEngine engine = AutoRerollEngine.getInstance();
-		String text;
-		int color;
-		String full;
-		if (engine.isRunning()) {
-			text = runningStatus(engine);
-			color = RerollTokens.STATE_SUCCESS;
-			full = targetDetail(engine);
-		} else if (engine.isResumeWaiting()) {
-			text = "Waiting for focus" + (engine.rolls() > 0 ? " - " + engine.rolls() + " rolls" : "");
-			color = RerollTokens.STATE_DANGER;
-			full = text;
-		} else if (engine.stopReason() != null) {
-			StringBuilder suffix = new StringBuilder();
-			if (engine.rolls() > 0) {
-				suffix.append(" - ").append(engine.rolls()).append(" rolls");
-			}
-			int resets = engine.potentialResetsThisSession();
-			if (resets > 0) {
-				suffix.append(suffix.length() == 0 ? " - " : ", ").append(resets)
-						.append(" potential reset").append(resets == 1 ? "" : "s");
-			}
-			boolean success = engine.stopReason() == StopReason.SUCCESS;
-			String reason = success && engine.stopCondition() == AutoRerollEngine.StopCondition.ALL
-					? "all targets met"
-					: stopReasonText(engine.stopReason());
-			text = "Stopped: " + reason + suffix;
-			color = success ? RerollTokens.STATE_SUCCESS : RerollTokens.STATE_DANGER;
-			full = text;
-		} else if (!VmaClientConfigs.isAutoRerollEnabled()) {
-			text = "Auto-reroll disabled";
-			color = RerollTokens.TEXT_DISABLED;
-			full = text;
-		} else if (stationGear().isEmpty()) {
-			text = "No gear in station";
-			color = RerollTokens.TEXT_MUTED;
-			full = text;
-		} else if (noCandidates) {
-			text = "No rollable modifiers";
-			color = RerollTokens.TEXT_MUTED;
-			full = text;
-		} else if (state.targets().isEmpty()) {
-			text = "Add a target modifier";
-			color = RerollTokens.TEXT_MUTED;
-			full = text;
-		} else if (state.targets().size() == 1 && state.focusedTarget() >= 0
-				&& state.focusedTarget() < state.targets().size()
-				&& state.targets().get(state.focusedTarget()).thresholdEnabled()) {
-			text = "Ready : goal at least "
-					+ formatDisplay(state.targets().get(state.focusedTarget()).thresholdValue(),
-							currentTargetRange().percent());
-			color = RerollTokens.STATE_SUCCESS;
-			full = text;
-		} else if (state.targets().size() == 1) {
-			text = "Ready : any roll";
-			color = RerollTokens.STATE_SUCCESS;
-			full = text;
-		} else {
-			text = "Ready : " + state.targets().size() + " targets";
-			color = RerollTokens.STATE_SUCCESS;
-			full = targetDetail(engine);
-		}
-		int maxChars = (layout.width - RerollPanelLayout.PAD_X * 2) / 7;
-		if (text.length() > maxChars) {
-			text = truncate(text, maxChars);
-		}
-		if (rowHovered(layout, mouseX, mouseY, layout.statusY, RerollPanelLayout.ROW_H) && !full.equals(text)) {
-			hoverTooltip(full, mouseX, mouseY);
-		}
-		drawString(poseStack, text, layout.x + RerollPanelLayout.PAD_X, layout.statusY + 3, color);
-	}
 
-	private String runningStatus(AutoRerollEngine engine) {
+	String runningStatus(AutoRerollEngine engine) {
 		String base = "Rolling #" + engine.rolls();
 		if (state.targets().size() <= 1) {
 			RollTarget target = state.focusedTarget() >= 0 && state.focusedTarget() < state.targets().size()
@@ -701,7 +626,7 @@ public final class RerollPanel {
 		return base + " - " + met + "/" + state.targets().size() + label;
 	}
 
-	private String targetDetail(AutoRerollEngine engine) {
+	String targetDetail(AutoRerollEngine engine) {
 		if (state.targets().isEmpty()) {
 			return "";
 		}
@@ -834,7 +759,7 @@ public final class RerollPanel {
 
 	// --------------------------------------------------------- tooltip
 
-	private void hoverTooltip(String fullText, int mouseX, int mouseY) {
+	public void hoverTooltip(String fullText, int mouseX, int mouseY) {
 		if (fullText == null || fullText.isEmpty()) {
 			return;
 		}
@@ -992,5 +917,83 @@ public final class RerollPanel {
 			int rowY = up ? topY + (2 - i) : topY + i;
 			GuiComponent.fill(poseStack, centerX - i, rowY, centerX + i + 1, rowY + 1, color);
 		}
+	}
+
+	public record StatusInfo(String text, int color, String full) {
+	}
+
+	public StatusInfo computeStatusInfo(List<GearModificationAction> operations) {
+		AutoRerollEngine engine = AutoRerollEngine.getInstance();
+		ItemStack gear = stationGear();
+		boolean noCandidates;
+		if (operations.isEmpty() || gear.isEmpty()) {
+			noCandidates = true;
+		} else {
+			int safeIndex = Math.min(state.operationIndex(), operations.size() - 1);
+			List<ModifierCatalog.Candidate> cands = candidates(gear, operations.get(safeIndex));
+			noCandidates = cands.isEmpty();
+		}
+		String text;
+		int color;
+		String full;
+		if (engine.isRunning()) {
+			text = runningStatus(engine);
+			color = RerollTokens.STATE_SUCCESS;
+			full = targetDetail(engine);
+		} else if (engine.isResumeWaiting()) {
+			text = "Waiting for focus" + (engine.rolls() > 0 ? " - " + engine.rolls() + " rolls" : "");
+			color = RerollTokens.STATE_DANGER;
+			full = text;
+		} else if (engine.stopReason() != null) {
+			StringBuilder suffix = new StringBuilder();
+			if (engine.rolls() > 0) {
+				suffix.append(" - ").append(engine.rolls()).append(" rolls");
+			}
+			int resets = engine.potentialResetsThisSession();
+			if (resets > 0) {
+				suffix.append(suffix.length() == 0 ? " - " : ", ").append(resets)
+						.append(" potential reset").append(resets == 1 ? "" : "s");
+			}
+			boolean success = engine.stopReason() == StopReason.SUCCESS;
+			String reason = success && engine.stopCondition() == AutoRerollEngine.StopCondition.ALL
+					? "all targets met"
+					: stopReasonText(engine.stopReason());
+			text = "Stopped: " + reason + suffix;
+			color = success ? RerollTokens.STATE_SUCCESS : RerollTokens.STATE_DANGER;
+			full = text;
+		} else if (!VmaClientConfigs.isAutoRerollEnabled()) {
+			text = "Auto-reroll disabled";
+			color = RerollTokens.TEXT_DISABLED;
+			full = text;
+		} else if (gear.isEmpty()) {
+			text = "No gear in station";
+			color = RerollTokens.TEXT_MUTED;
+			full = text;
+		} else if (noCandidates) {
+			text = "No rollable modifiers";
+			color = RerollTokens.TEXT_MUTED;
+			full = text;
+		} else if (state.targets().isEmpty()) {
+			text = "Add a target modifier";
+			color = RerollTokens.TEXT_MUTED;
+			full = text;
+		} else if (state.targets().size() == 1 && state.focusedTarget() >= 0
+				&& state.focusedTarget() < state.targets().size()
+				&& state.targets().get(state.focusedTarget()).thresholdEnabled()) {
+			text = "Ready : goal at least "
+					+ formatDisplay(state.targets().get(state.focusedTarget()).thresholdValue(),
+							currentTargetRange().percent());
+			color = RerollTokens.STATE_SUCCESS;
+			full = text;
+		} else if (state.targets().size() == 1) {
+			text = "Ready : any roll";
+			color = RerollTokens.STATE_SUCCESS;
+			full = text;
+		} else {
+			text = "Ready : " + state.targets().size() + " targets";
+			color = RerollTokens.STATE_SUCCESS;
+			full = targetDetail(engine);
+		}
+		return new StatusInfo(text, color, full);
 	}
 }
