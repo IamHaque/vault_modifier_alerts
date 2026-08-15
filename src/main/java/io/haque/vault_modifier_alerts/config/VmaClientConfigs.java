@@ -81,7 +81,7 @@ public final class VmaClientConfigs {
 		builder.pop();
 
 		builder.push("Auto Reroll");
-		AUTO_REROLL_ENABLED = builder.define("enabled", true);
+		AUTO_REROLL_ENABLED = builder.define("enabled", false);
 		AUTO_REROLL_TICK_INTERVAL = builder.defineInRange("tickInterval", 10, 4, 200);
 		AUTO_REROLL_ROLL_GAP_TICKS = builder.defineInRange("rollGapTicks", 4, 2, 40);
 		AUTO_REROLL_ROLL_TIMEOUT_TICKS = builder.defineInRange("rollTimeoutTicks", 60, 10, 400);

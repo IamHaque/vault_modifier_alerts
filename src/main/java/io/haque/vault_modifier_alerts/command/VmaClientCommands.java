@@ -37,6 +37,8 @@ public final class VmaClientCommands {
 						.then(Commands.literal("on").executes(ctx -> setSound(ctx.getSource(), true)))
 						.then(Commands.literal("off").executes(ctx -> setSound(ctx.getSource(), false))))
 				.then(Commands.literal("reroll")
+						.then(Commands.literal("enable").executes(ctx -> setRerollEnabled(ctx.getSource(), true)))
+						.then(Commands.literal("disable").executes(ctx -> setRerollEnabled(ctx.getSource(), false)))
 						.then(Commands.literal("start").executes(ctx -> rerollStart(ctx.getSource())))
 						.then(Commands.literal("stop").executes(ctx -> rerollStop(ctx.getSource()))))
 				.then(Commands.literal("status").executes(ctx -> status(ctx.getSource()))));
@@ -54,7 +56,20 @@ public final class VmaClientCommands {
 		return Command.SINGLE_SUCCESS;
 	}
 
+	private static int setRerollEnabled(CommandSourceStack source, boolean value) {
+		VmaClientConfigs.setAutoRerollEnabled(value);
+		if (!value && AutoRerollEngine.getInstance().isRunning()) {
+			AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
+		}
+		source.sendSuccess(new TextComponent("[VMA] Auto-reroll " + (value ? "enabled" : "disabled")), false);
+		return Command.SINGLE_SUCCESS;
+	}
+
 	private static int rerollStart(CommandSourceStack source) {
+		if (!VmaClientConfigs.isAutoRerollEnabled()) {
+			source.sendFailure(new TextComponent("[VMA] Auto-reroll is disabled (use /vma reroll enable)"));
+			return 0;
+		}
 		RerollPanel.RerollSelection selection = RerollPanel.getInstance().currentSelection();
 		if (selection == null) {
 			source.sendFailure(new TextComponent("[VMA] Open the Artisan Station and pick a target first"));
@@ -107,6 +122,7 @@ public final class VmaClientCommands {
 		List<String> lines = new ArrayList<>();
 		lines.add("[VMA] debug: " + (VmaClientConfigs.isDebugLogging() ? "on" : "off")
 				+ ", sounds: " + (VmaClientConfigs.isAlertSoundEnabled() ? "on" : "off")
+				+ ", reroll: " + (VmaClientConfigs.isAutoRerollEnabled() ? "on" : "off")
 				+ ", hud ordering: " + (VmaClientConfigs.isHudOrderingEnabled() ? "on" : "off"));
 		if (VmaClientConfigs.isHudOrderingEnabled() && ModifierOrdering.getLastOrdered() != null) {
 			lines.add("[VMA] HUD order (first -> last): " + String.join(", ", ModifierOrdering.getLastOrdered()));
