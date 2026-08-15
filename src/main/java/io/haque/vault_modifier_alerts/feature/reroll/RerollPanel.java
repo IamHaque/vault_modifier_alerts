@@ -67,7 +67,7 @@ public final class RerollPanel {
 	// (delegates)
 
 	public boolean isVisible() {
-		return state.isVisible();
+		return VmaClientConfigs.isRerollPanelEnabled() && state.isVisible();
 	}
 
 	public void setVisible(boolean visible) {

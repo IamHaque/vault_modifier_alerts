@@ -2,6 +2,7 @@ package io.haque.vault_modifier_alerts.feature.reroll;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
+import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.CounterRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StartStopButtonElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StatusRowElement;
@@ -49,9 +50,18 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 		instance.layout((screenSize, gui, parent, world) -> {
 			int width = RerollPanel.computeWidth(screenSize.width(), gui.left(), gui.right());
 			int panelHeight = RerollPanel.getInstance().currentHeight();
-			int x = gui.left() - MARGIN - width;
-			if (x < 0) {
+			String side = VmaClientConfigs.rerollPanelSide();
+			int x;
+			if ("LEFT".equals(side)) {
+				x = gui.left() - MARGIN - width;
+			} else if ("RIGHT".equals(side)) {
 				x = gui.right() + MARGIN;
+			} else {
+				// AUTO: left-first, fallback right
+				x = gui.left() - MARGIN - width;
+				if (x < 0) {
+					x = gui.right() + MARGIN;
+				}
 			}
 			x = Mth.clamp(x, 0, Math.max(0, screenSize.width() - width - MARGIN));
 			int y = Mth.clamp(gui.top() + 16, 4, Math.max(4, screenSize.height() - panelHeight - 4));

@@ -47,6 +47,10 @@ public final class VmaClientConfigs {
 	public static final ForgeConfigSpec.DoubleValue REROLL_VOLUME;
 	public static final ForgeConfigSpec.DoubleValue REROLL_PITCH;
 
+	public static final ForgeConfigSpec.BooleanValue REROLL_PANEL_ENABLED;
+	public static final ForgeConfigSpec.ConfigValue<String> REROLL_PANEL_SIDE;
+	public static final ForgeConfigSpec.BooleanValue REROLL_PANEL_COMPACT_MODE;
+
 	static {
 		ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
 
@@ -93,6 +97,18 @@ public final class VmaClientConfigs {
 				VmaReference.DEFAULT_REROLL_SOUND_EVENT, VmaClientConfigs::isValidSoundEventId);
 		REROLL_VOLUME = builder.defineInRange("volume", 1.0D, 0.0D, 2.0D);
 		REROLL_PITCH = builder.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
+		builder.pop();
+
+		builder.push("Reroll Panel");
+		REROLL_PANEL_ENABLED = builder
+				.comment("Show the auto-reroll side panel when the artisan station is open.")
+				.define("enabled", true);
+		REROLL_PANEL_SIDE = builder
+				.comment("Panel side preference: AUTO (left-first, fallback right), LEFT, or RIGHT.")
+				.define("side", "AUTO", v -> v instanceof String s && (s.equals("AUTO") || s.equals("LEFT") || s.equals("RIGHT")));
+		REROLL_PANEL_COMPACT_MODE = builder
+				.comment("Collapse optional rows (range, counter) for a denser HUD.")
+				.define("compactMode", false);
 		builder.pop();
 
 		SPEC = builder.build();
@@ -171,6 +187,18 @@ public final class VmaClientConfigs {
 
 	public static void setAutoResetPotential(boolean value) {
 		AUTO_REROLL_RESET_POTENTIAL.set(value);
+	}
+
+	public static boolean isRerollPanelEnabled() {
+		return REROLL_PANEL_ENABLED.get();
+	}
+
+	public static String rerollPanelSide() {
+		return REROLL_PANEL_SIDE.get();
+	}
+
+	public static boolean isRerollPanelCompactMode() {
+		return REROLL_PANEL_COMPACT_MODE.get();
 	}
 
 	public static String rerollSuccessSoundEvent() {
