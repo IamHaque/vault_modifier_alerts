@@ -259,7 +259,9 @@ public final class RerollPanel {
 			if (player == null) {
 				return 0;
 			}
-			return VaultGearCraftingHelper.getReducedPotential(gear, player, operation.modification());
+			int currentPotential = ModifierCatalog.craftingPotential(gear);
+			int reducedPotential = VaultGearCraftingHelper.getReducedPotential(gear, player, operation.modification());
+			return currentPotential - reducedPotential;
 		} catch (Exception ignored) {
 			return 0;
 		}
@@ -324,7 +326,6 @@ public final class RerollPanel {
 			return;
 		}
 
-		boolean enabled = VmaClientConfigs.isAutoRerollEnabled();
 		drawRow(poseStack, layout, "Focus", displayOperationName(operation), layout.focusY, mouseX, mouseY,
 				state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION);
 		drawModifierRow(poseStack, layout, mouseX, mouseY);
@@ -332,9 +333,6 @@ public final class RerollPanel {
 		drawMinRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawRangeRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawPotentialRow(poseStack, layout, x, width, operation);
-		drawToggleRow(poseStack, layout, x, "Auto-reroll", enabled, layout.rerollToggleY, mouseX, mouseY);
-		drawToggleRow(poseStack, layout, x, "Auto-reset potential",
-				VmaClientConfigs.isAutoResetPotentialEnabled(), layout.resetToggleY, mouseX, mouseY);
 		drawButton(poseStack, layout, engine, state.canStart(), mouseX, mouseY);
 		drawStatus(poseStack, layout, candidates.isEmpty(), mouseX, mouseY);
 		drawCounterRow(poseStack, layout, engine);
@@ -397,22 +395,6 @@ public final class RerollPanel {
 			case MIN_DEC -> state.stepMin(-state.currentStep());
 			case MIN_INC -> state.stepMin(state.currentStep());
 			case MIN_FIELD -> state.toggleMinFocus();
-			case REROLL_TOGGLE -> {
-				state.loseMinFocus();
-				state.closeDropdown();
-				boolean enabled = !VmaClientConfigs.isAutoRerollEnabled();
-				VmaClientConfigs.setAutoRerollEnabled(enabled);
-				if (!enabled) {
-					AutoRerollEngine.getInstance().cancelResume();
-					if (AutoRerollEngine.getInstance().isRunning()) {
-						AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
-					}
-				}
-			}
-			case RESET_TOGGLE -> {
-				state.loseMinFocus();
-				VmaClientConfigs.setAutoResetPotential(!VmaClientConfigs.isAutoResetPotentialEnabled());
-			}
 			case START_BUTTON -> {
 				state.loseMinFocus();
 				AutoRerollEngine engine = AutoRerollEngine.getInstance();
@@ -633,18 +615,6 @@ public final class RerollPanel {
 		if (!right.isEmpty()) {
 			drawRight(poseStack, right, x + width - RerollPanelLayout.PAD_X, layout.potentialY + 3, RerollTokens.TEXT_MUTED);
 		}
-	}
-
-	private void drawToggleRow(PoseStack poseStack, RerollPanelLayout layout, int x, String label, boolean enabled,
-			int y, int mouseX, int mouseY) {
-		boolean hovered = rowHovered(layout, mouseX, mouseY, y, RerollPanelLayout.ROW_H);
-		if (hovered) {
-			GuiComponent.fill(poseStack, layout.x, y, layout.x + layout.width,
-					y + RerollPanelLayout.ROW_H, RerollTokens.ROW_HOVER);
-		}
-		drawString(poseStack, "[" + (enabled ? "x" : " ") + "]", x + RerollPanelLayout.PAD_X, y + 3,
-				enabled ? RerollTokens.STATE_SUCCESS : RerollTokens.TEXT_DISABLED);
-		drawString(poseStack, label, x + 30, y + 3, enabled ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED);
 	}
 
 	private void drawButton(PoseStack poseStack, RerollPanelLayout layout, AutoRerollEngine engine, boolean canStart,

@@ -1,6 +1,8 @@
 package io.haque.vault_modifier_alerts.feature.reroll;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
+import io.haque.vault_modifier_alerts.feature.reroll.ui.ToggleRowElement;
 import iskallia.vault.client.gui.framework.element.ContainerElement;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
@@ -55,6 +57,47 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 				instance.setWidth(width);
 			}
 		});
+
+		// Auto-reroll toggle (row 8, 0-indexed: title + 6 rows above)
+		int rerollToggleY = RerollPanelLayout.TITLE_H + 6 * RerollPanelLayout.ROW_H;
+		ToggleRowElement rerollToggle = new ToggleRowElement(
+				0, rerollToggleY, RerollPanelLayout.WIDTH,
+				"Auto-reroll",
+				VmaClientConfigs::isAutoRerollEnabled,
+				() -> {
+					RerollPanelState.getInstance().loseMinFocus();
+					RerollPanelState.getInstance().closeDropdown();
+					boolean enabled = !VmaClientConfigs.isAutoRerollEnabled();
+					VmaClientConfigs.setAutoRerollEnabled(enabled);
+					if (!enabled) {
+						AutoRerollEngine.getInstance().cancelResume();
+						if (AutoRerollEngine.getInstance().isRunning()) {
+							AutoRerollEngine.getInstance().stop(AutoRerollEngine.StopReason.STOPPED, false);
+						}
+					}
+				});
+		rerollToggle.layout((screenSize, gui, parent, world) -> {
+			world.positionXY(0, rerollToggleY);
+			world.width(parent.width());
+		});
+		instance.addElement(rerollToggle);
+
+		// Auto-reset toggle (row 9)
+		int resetToggleY = RerollPanelLayout.TITLE_H + 7 * RerollPanelLayout.ROW_H;
+		ToggleRowElement resetToggle = new ToggleRowElement(
+				0, resetToggleY, RerollPanelLayout.WIDTH,
+				"Auto-reset potential",
+				VmaClientConfigs::isAutoResetPotentialEnabled,
+				() -> {
+					RerollPanelState.getInstance().loseMinFocus();
+					VmaClientConfigs.setAutoResetPotential(!VmaClientConfigs.isAutoResetPotentialEnabled());
+				});
+		resetToggle.layout((screenSize, gui, parent, world) -> {
+			world.positionXY(0, resetToggleY);
+			world.width(parent.width());
+		});
+		instance.addElement(resetToggle);
+
 		return instance;
 	}
 
