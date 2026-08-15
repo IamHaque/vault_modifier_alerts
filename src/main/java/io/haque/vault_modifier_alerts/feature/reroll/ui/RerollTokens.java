@@ -1,5 +1,8 @@
 package io.haque.vault_modifier_alerts.feature.reroll.ui;
 
+import iskallia.vault.client.gui.framework.ScreenTextures;
+import iskallia.vault.client.gui.framework.element.ButtonElement;
+
 /**
  * Panel-local color and spacing tokens for the auto-reroll panel.
  * Maps onto the shared QOLHunters design token set (Design Guidelines §11).
@@ -37,6 +40,9 @@ public final class RerollTokens {
 	// Button
 	public static final int BUTTON_BG = 0xFF303030;
 	public static final int BUTTON_DISABLED_BG = 0xFF222222;
+
+	// Start/stop button atlas textures (host's generic 16px button)
+	public static final ButtonElement.ButtonTextures START_BUTTON_TEXTURES = ScreenTextures.BUTTON_EMPTY_16_TEXTURES;
 
 	// Dropdown
 	public static final int DROPDOWN_BG = 0xF0181818;

@@ -333,7 +333,6 @@ public final class RerollPanel {
 		drawMinRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawRangeRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawPotentialRow(poseStack, layout, x, width, operation);
-		drawButton(poseStack, layout, engine, state.canStart(), mouseX, mouseY);
 		drawStatus(poseStack, layout, candidates.isEmpty(), mouseX, mouseY);
 		drawCounterRow(poseStack, layout, engine);
 
@@ -395,18 +394,6 @@ public final class RerollPanel {
 			case MIN_DEC -> state.stepMin(-state.currentStep());
 			case MIN_INC -> state.stepMin(state.currentStep());
 			case MIN_FIELD -> state.toggleMinFocus();
-			case START_BUTTON -> {
-				state.loseMinFocus();
-				AutoRerollEngine engine = AutoRerollEngine.getInstance();
-				if (engine.isRunning()) {
-					engine.stop(StopReason.STOPPED, false);
-				} else if (state.canStart()) {
-					RerollSelection selection = currentSelection();
-					if (selection != null) {
-						engine.start(selection.operationId(), selection.targets(), selection.stopCondition());
-					}
-				}
-			}
 			case DROPDOWN_UP -> state.scrollDropdown(-1);
 			case DROPDOWN_DOWN -> state.scrollDropdown(1);
 			case DROPDOWN_ITEM -> {
@@ -615,27 +602,6 @@ public final class RerollPanel {
 		if (!right.isEmpty()) {
 			drawRight(poseStack, right, x + width - RerollPanelLayout.PAD_X, layout.potentialY + 3, RerollTokens.TEXT_MUTED);
 		}
-	}
-
-	private void drawButton(PoseStack poseStack, RerollPanelLayout layout, AutoRerollEngine engine, boolean canStart,
-			int mouseX, int mouseY) {
-		boolean running = engine.isRunning();
-		boolean hovered = rowHovered(layout, mouseX, mouseY, layout.buttonY, RerollPanelLayout.BUTTON_H);
-		if (running || canStart) {
-			GuiComponent.fill(poseStack, layout.x + RerollPanelLayout.PAD_X, layout.buttonY,
-					layout.x + layout.width - RerollPanelLayout.PAD_X,
-					layout.buttonY + RerollPanelLayout.BUTTON_H, hovered ? RerollTokens.ROW_HOVER : RerollTokens.BUTTON_BG);
-		}
-		String label = running ? "Stop" : "Start";
-		int color;
-		if (running) {
-			color = RerollTokens.STATE_DANGER;
-		} else if (canStart) {
-			color = hovered ? RerollTokens.ACCENT_GOLD : RerollTokens.STATE_SUCCESS;
-		} else {
-			color = RerollTokens.TEXT_DISABLED;
-		}
-		drawCentered(poseStack, label, layout.x + layout.width / 2, layout.buttonY + 3, color);
 	}
 
 	private void drawStatus(PoseStack poseStack, RerollPanelLayout layout, boolean noCandidates, int mouseX,

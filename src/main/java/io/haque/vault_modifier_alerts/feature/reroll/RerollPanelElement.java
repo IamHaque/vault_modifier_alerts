@@ -2,6 +2,7 @@ package io.haque.vault_modifier_alerts.feature.reroll;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
+import io.haque.vault_modifier_alerts.feature.reroll.ui.StartStopButtonElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.ToggleRowElement;
 import iskallia.vault.client.gui.framework.element.ContainerElement;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
@@ -97,6 +98,31 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 			world.width(parent.width());
 		});
 		instance.addElement(resetToggle);
+
+		// Start/stop button (row 10)
+		int buttonY = RerollPanelLayout.TITLE_H + 8 * RerollPanelLayout.ROW_H;
+		RerollPanelState state = RerollPanelState.getInstance();
+		StartStopButtonElement startButton = new StartStopButtonElement(
+				0, buttonY, RerollPanelLayout.WIDTH, RerollPanelLayout.BUTTON_H,
+				state,
+				() -> {
+					state.loseMinFocus();
+					AutoRerollEngine engine = AutoRerollEngine.getInstance();
+					if (engine.isRunning()) {
+						engine.stop(AutoRerollEngine.StopReason.STOPPED, false);
+					} else if (state.canStart()) {
+						RerollPanel.RerollSelection selection = RerollPanel.getInstance().currentSelection();
+						if (selection != null) {
+							engine.start(selection.operationId(), selection.targets(), selection.stopCondition());
+						}
+					}
+				});
+		startButton.setFont(net.minecraft.client.Minecraft.getInstance().font);
+		startButton.layout((screenSize, gui, parent, world) -> {
+			world.positionXY(RerollPanelLayout.PAD_X, buttonY);
+			world.width(parent.width() - 2 * RerollPanelLayout.PAD_X);
+		});
+		instance.addElement(startButton);
 
 		return instance;
 	}
