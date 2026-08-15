@@ -1,35 +1,31 @@
 package io.haque.vault_modifier_alerts.feature.reroll.ui;
 
+import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import iskallia.vault.client.gui.framework.ScreenTextures;
 import iskallia.vault.client.gui.framework.element.ButtonElement;
 
 /**
  * Panel-local color and spacing tokens for the auto-reroll panel.
- * Maps onto the shared QOLHunters design token set (Design Guidelines §11).
- * These are the reroll-specific semantic names; the underlying values match
- * the host framework's conventions for consistent visual weight.
- *
- * <p>TODO: replace drawPanelFrame()'s GuiComponent.fill() calls with a 9-slice
- * atlas panel texture once a PNG asset is available at
- * {@code vault_modifier_alerts:gui/panel/reroll_bg}.</p>
+ * Colors are themeable via config (Phase 7), with fallback defaults
+ * matching the QOLHunters design token set (Design Guidelines §11).
  */
 public final class RerollTokens {
 	private RerollTokens() {
 	}
 
-	// Panel chrome
-	public static final int PANEL_BG = 0xEE111111;
-	public static final int PANEL_BORDER = 0xFF6B6B6B;
-	public static final int ACCENT_GOLD = 0xFFE3C38C;
+	// Panel chrome (configurable)
+	public static int PANEL_BG() { return VmaClientConfigs.panelBgColor(); }
+	public static int PANEL_BORDER() { return VmaClientConfigs.panelBorderColor(); }
+	public static int ACCENT_GOLD() { return VmaClientConfigs.panelAccentGoldColor(); }
 
-	// Text
-	public static final int TEXT_DEFAULT = 0xFFFFFFFF;
+	// Text (configurable)
+	public static int TEXT_DEFAULT() { return VmaClientConfigs.panelTextColor(); }
 	public static final int TEXT_MUTED = 0xFFA0A0A0;
 	public static final int TEXT_DISABLED = 0xFF707070;
 
-	// State
-	public static final int STATE_SUCCESS = 0xFF55FF55;
-	public static final int STATE_DANGER = 0xFFFF5555;
+	// State (configurable)
+	public static int STATE_SUCCESS() { return VmaClientConfigs.panelSuccessColor(); }
+	public static int STATE_DANGER() { return VmaClientConfigs.panelDangerColor(); }
 	public static final int ROW_HOVER = 0xFF3A3A3A;
 	public static final int ROW_OPEN = 0xFF543C1F;
 

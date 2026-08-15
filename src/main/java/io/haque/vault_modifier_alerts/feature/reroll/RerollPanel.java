@@ -330,10 +330,10 @@ public final class RerollPanel {
 		pendingTooltip = null;
 
 		drawPanelFrame(poseStack, layout);
-		drawCentered(poseStack, "Auto-Reroll", x + width / 2, y + 4, RerollTokens.ACCENT_GOLD);
+		drawCentered(poseStack, "Auto-Reroll", x + width / 2, y + 4, RerollTokens.ACCENT_GOLD());
 
 		if (operation == null) {
-			drawString(poseStack, "No re-roll actions", x + RerollPanelLayout.PAD_X, layout.focusY + 3, RerollTokens.STATE_DANGER);
+			drawString(poseStack, "No re-roll actions", x + RerollPanelLayout.PAD_X, layout.focusY + 3, RerollTokens.STATE_DANGER());
 			drawTooltip(poseStack);
 			return;
 		}
@@ -431,13 +431,13 @@ public final class RerollPanel {
 
 	private void drawPanelFrame(PoseStack poseStack, RerollPanelLayout layout) {
 		GuiComponent.fill(poseStack, layout.x, layout.y, layout.x + layout.width,
-				layout.y + layout.totalHeight, RerollTokens.PANEL_BG);
-		GuiComponent.fill(poseStack, layout.x, layout.y, layout.x + layout.width, layout.y + 2, RerollTokens.ACCENT_GOLD);
+				layout.y + layout.totalHeight, RerollTokens.PANEL_BG());
+		GuiComponent.fill(poseStack, layout.x, layout.y, layout.x + layout.width, layout.y + 2, RerollTokens.ACCENT_GOLD());
 		GuiComponent.fill(poseStack, layout.x, layout.y + layout.totalHeight - 1, layout.x + layout.width,
-				layout.y + layout.totalHeight, RerollTokens.PANEL_BORDER);
-		GuiComponent.fill(poseStack, layout.x, layout.y + 2, layout.x + 1, layout.y + layout.totalHeight, RerollTokens.PANEL_BORDER);
+				layout.y + layout.totalHeight, RerollTokens.PANEL_BORDER());
+		GuiComponent.fill(poseStack, layout.x, layout.y + 2, layout.x + 1, layout.y + layout.totalHeight, RerollTokens.PANEL_BORDER());
 		GuiComponent.fill(poseStack, layout.x + layout.width - 1, layout.y + 2,
-				layout.x + layout.width, layout.y + layout.totalHeight, RerollTokens.PANEL_BORDER);
+				layout.x + layout.width, layout.y + layout.totalHeight, RerollTokens.PANEL_BORDER());
 	}
 
 	private void drawRow(PoseStack poseStack, RerollPanelLayout layout, String label, String value, int y, int mouseX,
@@ -450,7 +450,7 @@ public final class RerollPanel {
 			GuiComponent.fill(poseStack, layout.x, y, layout.x + layout.width,
 					y + RerollPanelLayout.ROW_H, RerollTokens.ROW_HOVER);
 		}
-		int color = VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED;
+		int color = VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED;
 		drawString(poseStack, label, layout.x + RerollPanelLayout.PAD_X, y + 3, RerollTokens.TEXT_MUTED);
 		drawString(poseStack, value, layout.x + 62, y + 3, color);
 		drawTriangle(poseStack, layout.x + layout.width - 8, y + 6, false, color);
@@ -469,7 +469,7 @@ public final class RerollPanel {
 			GuiComponent.fill(poseStack, layout.x, layout.modifierY, layout.x + layout.width,
 					layout.modifierY + RerollPanelLayout.ROW_H, RerollTokens.ROW_HOVER);
 		}
-		int color = VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED;
+		int color = VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED;
 		drawString(poseStack, "Modifier", layout.x + RerollPanelLayout.PAD_X, layout.modifierY + 3, RerollTokens.TEXT_MUTED);
 		String placeholder = state.targets().isEmpty() ? "add a modifier..." : "+ add modifier";
 		drawString(poseStack, placeholder, layout.x + 62, layout.modifierY + 3, color);
@@ -508,7 +508,7 @@ public final class RerollPanel {
 		if (truncated) {
 			value = truncate(value, maxChars);
 		}
-		int color = VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED;
+		int color = VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED;
 		drawString(poseStack, value, layout.x + 62, layout.targetsY + 3, color);
 		if (hovered && !chipHovered && !clearHovered && truncated) {
 			hoverTooltip(full, mouseX, mouseY);
@@ -516,7 +516,7 @@ public final class RerollPanel {
 		GuiComponent.fill(poseStack, x + width - 44, layout.targetsY, x + width - 26,
 				layout.targetsY + RerollPanelLayout.ROW_H, clearHovered ? RerollTokens.ROW_HOVER : RerollTokens.DROPDOWN_BG);
 		drawCentered(poseStack, "x", x + width - 35, layout.targetsY + 3,
-				clearHovered ? RerollTokens.STATE_DANGER : (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED));
+				clearHovered ? RerollTokens.STATE_DANGER() : (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED));
 		if (clearHovered) {
 			hoverTooltip("Clear all targets", mouseX, mouseY);
 		}
@@ -525,7 +525,7 @@ public final class RerollPanel {
 				chipHovered ? RerollTokens.ROW_HOVER : RerollTokens.DROPDOWN_BG);
 		drawString(poseStack, state.stopCondition() == AutoRerollEngine.StopCondition.ANY ? "any" : "all",
 				x + width - 22, layout.targetsY + 3,
-				chipHovered ? RerollTokens.ACCENT_GOLD : (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED));
+				chipHovered ? RerollTokens.ACCENT_GOLD() : (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED));
 	}
 
 	private void drawMinRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX, int mouseY) {
@@ -541,7 +541,7 @@ public final class RerollPanel {
 				&& mouseX >= layout.minFieldLeft() && mouseX < layout.minFieldRight();
 		boolean hasThreshold = hasTarget
 				&& state.targets().get(state.focusedTarget()).thresholdEnabled();
-		int buttonColor = enabled ? (hoveredDec ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_MUTED) : RerollTokens.TEXT_DISABLED;
+		int buttonColor = enabled ? (hoveredDec ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_MUTED) : RerollTokens.TEXT_DISABLED;
 		GuiComponent.fill(poseStack, x + 2, layout.minY + 2, x + 14, layout.minY + 12,
 				enabled ? (hoveredDec ? RerollTokens.ROW_HOVER : RerollTokens.BUTTON_BG) : RerollTokens.BUTTON_DISABLED_BG);
 		GuiComponent.fill(poseStack, x + width - 14, layout.minY + 2, x + width - 2, layout.minY + 12,
@@ -566,7 +566,7 @@ public final class RerollPanel {
 			shown = "any";
 		}
 		drawString(poseStack, shown, layout.minFieldLeft() + 2, layout.minY + 3, hasTarget
-				? (hoveredField && !state.isMinInputFocused() ? RerollTokens.ACCENT_GOLD : RerollTokens.TEXT_DEFAULT)
+				? (hoveredField && !state.isMinInputFocused() ? RerollTokens.ACCENT_GOLD() : RerollTokens.TEXT_DEFAULT())
 				: RerollTokens.TEXT_DISABLED);
 	}
 
@@ -592,7 +592,7 @@ public final class RerollPanel {
 		int cost = potentialCost(gear, operation);
 		String left = "Potential " + potential + "/" + max;
 		String right = cost > 0 && potential >= cost ? "~" + potential / cost + " rolls" : "";
-		int color = potential > 0 ? (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED) : RerollTokens.STATE_DANGER;
+		int color = potential > 0 ? (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED) : RerollTokens.STATE_DANGER();
 		drawString(poseStack, left, x + RerollPanelLayout.PAD_X, layout.potentialY + 3, color);
 		if (!right.isEmpty()) {
 			drawRight(poseStack, right, x + width - RerollPanelLayout.PAD_X, layout.potentialY + 3, RerollTokens.TEXT_MUTED);
@@ -685,13 +685,13 @@ public final class RerollPanel {
 			boxY = Math.max(2, tooltipY - boxHeight - 6);
 		}
 		GuiComponent.fill(poseStack, boxX, boxY, boxX + boxWidth, boxY + boxHeight, RerollTokens.TOOLTIP_BG);
-		GuiComponent.fill(poseStack, boxX, boxY, boxX + boxWidth, boxY + 1, RerollTokens.PANEL_BORDER);
-		GuiComponent.fill(poseStack, boxX, boxY + boxHeight - 1, boxX + boxWidth, boxY + boxHeight, RerollTokens.PANEL_BORDER);
-		GuiComponent.fill(poseStack, boxX, boxY, boxX + 1, boxY + boxHeight, RerollTokens.PANEL_BORDER);
-		GuiComponent.fill(poseStack, boxX + boxWidth - 1, boxY, boxX + boxWidth, boxY + boxHeight, RerollTokens.PANEL_BORDER);
+		GuiComponent.fill(poseStack, boxX, boxY, boxX + boxWidth, boxY + 1, RerollTokens.PANEL_BORDER());
+		GuiComponent.fill(poseStack, boxX, boxY + boxHeight - 1, boxX + boxWidth, boxY + boxHeight, RerollTokens.PANEL_BORDER());
+		GuiComponent.fill(poseStack, boxX, boxY, boxX + 1, boxY + boxHeight, RerollTokens.PANEL_BORDER());
+		GuiComponent.fill(poseStack, boxX + boxWidth - 1, boxY, boxX + boxWidth, boxY + boxHeight, RerollTokens.PANEL_BORDER());
 		int lineY = boxY + 4;
 		for (String line : lines) {
-			drawString(poseStack, line, boxX + 3, lineY, RerollTokens.TEXT_DEFAULT);
+			drawString(poseStack, line, boxX + 3, lineY, RerollTokens.TEXT_DEFAULT());
 			lineY += font.lineHeight;
 		}
 	}
@@ -835,11 +835,11 @@ public final class RerollPanel {
 		String full;
 		if (engine.isRunning()) {
 			text = runningStatus(engine);
-			color = RerollTokens.STATE_SUCCESS;
+			color = RerollTokens.STATE_SUCCESS();
 			full = targetDetail(engine);
 		} else if (engine.isResumeWaiting()) {
 			text = "Waiting for focus" + (engine.rolls() > 0 ? " - " + engine.rolls() + " rolls" : "");
-			color = RerollTokens.STATE_DANGER;
+			color = RerollTokens.STATE_DANGER();
 			full = text;
 		} else if (engine.stopReason() != null) {
 			StringBuilder suffix = new StringBuilder();
@@ -856,7 +856,7 @@ public final class RerollPanel {
 					? "all targets met"
 					: stopReasonText(engine.stopReason());
 			text = "Stopped: " + reason + suffix;
-			color = success ? RerollTokens.STATE_SUCCESS : RerollTokens.STATE_DANGER;
+			color = success ? RerollTokens.STATE_SUCCESS() : RerollTokens.STATE_DANGER();
 			full = text;
 		} else if (!VmaClientConfigs.isAutoRerollEnabled()) {
 			text = "Auto-reroll disabled";
@@ -880,15 +880,15 @@ public final class RerollPanel {
 			text = "Ready : goal at least "
 					+ formatDisplay(state.targets().get(state.focusedTarget()).thresholdValue(),
 							currentTargetRange().percent());
-			color = RerollTokens.STATE_SUCCESS;
+			color = RerollTokens.STATE_SUCCESS();
 			full = text;
 		} else if (state.targets().size() == 1) {
 			text = "Ready : any roll";
-			color = RerollTokens.STATE_SUCCESS;
+			color = RerollTokens.STATE_SUCCESS();
 			full = text;
 		} else {
 			text = "Ready : " + state.targets().size() + " targets";
-			color = RerollTokens.STATE_SUCCESS;
+			color = RerollTokens.STATE_SUCCESS();
 			full = targetDetail(engine);
 		}
 		StatusInfo fresh = new StatusInfo(text, color, full);

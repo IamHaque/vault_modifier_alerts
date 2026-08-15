@@ -50,6 +50,12 @@ public final class VmaClientConfigs {
 	public static final ForgeConfigSpec.BooleanValue REROLL_PANEL_ENABLED;
 	public static final ForgeConfigSpec.ConfigValue<String> REROLL_PANEL_SIDE;
 	public static final ForgeConfigSpec.BooleanValue REROLL_PANEL_COMPACT_MODE;
+	public static final ForgeConfigSpec.IntValue PANEL_BG_COLOR;
+	public static final ForgeConfigSpec.IntValue PANEL_BORDER_COLOR;
+	public static final ForgeConfigSpec.IntValue PANEL_TEXT_COLOR;
+	public static final ForgeConfigSpec.IntValue PANEL_ACCENT_GOLD_COLOR;
+	public static final ForgeConfigSpec.IntValue PANEL_SUCCESS_COLOR;
+	public static final ForgeConfigSpec.IntValue PANEL_DANGER_COLOR;
 
 	static {
 		ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -109,6 +115,24 @@ public final class VmaClientConfigs {
 		REROLL_PANEL_COMPACT_MODE = builder
 				.comment("Collapse optional rows (range, counter) for a denser HUD.")
 				.define("compactMode", false);
+		PANEL_BG_COLOR = builder
+				.comment("Panel background color (ARGB hex).")
+				.defineInRange("panelBgColor", 0xEE111111, 0, 0xFFFFFFFF);
+		PANEL_BORDER_COLOR = builder
+				.comment("Panel border color (ARGB hex).")
+				.defineInRange("panelBorderColor", 0xFF6B6B6B, 0, 0xFFFFFFFF);
+		PANEL_TEXT_COLOR = builder
+				.comment("Default text color (ARGB hex).")
+				.defineInRange("panelTextColor", 0xFFFFFFFF, 0, 0xFFFFFFFF);
+		PANEL_ACCENT_GOLD_COLOR = builder
+				.comment("Gold accent color for headers and highlights (ARGB hex).")
+				.defineInRange("panelAccentGoldColor", 0xFFE3C38C, 0, 0xFFFFFFFF);
+		PANEL_SUCCESS_COLOR = builder
+				.comment("Success/ready state color (ARGB hex).")
+				.defineInRange("panelSuccessColor", 0xFF55FF55, 0, 0xFFFFFFFF);
+		PANEL_DANGER_COLOR = builder
+				.comment("Danger/error state color (ARGB hex).")
+				.defineInRange("panelDangerColor", 0xFFFF5555, 0, 0xFFFFFFFF);
 		builder.pop();
 
 		SPEC = builder.build();
@@ -199,6 +223,30 @@ public final class VmaClientConfigs {
 
 	public static boolean isRerollPanelCompactMode() {
 		return REROLL_PANEL_COMPACT_MODE.get();
+	}
+
+	public static int panelBgColor() {
+		return PANEL_BG_COLOR.get();
+	}
+
+	public static int panelBorderColor() {
+		return PANEL_BORDER_COLOR.get();
+	}
+
+	public static int panelTextColor() {
+		return PANEL_TEXT_COLOR.get();
+	}
+
+	public static int panelAccentGoldColor() {
+		return PANEL_ACCENT_GOLD_COLOR.get();
+	}
+
+	public static int panelSuccessColor() {
+		return PANEL_SUCCESS_COLOR.get();
+	}
+
+	public static int panelDangerColor() {
+		return PANEL_DANGER_COLOR.get();
 	}
 
 	public static String rerollSuccessSoundEvent() {

@@ -82,13 +82,13 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 		Font font = Minecraft.getInstance().font;
 
 		GuiComponent.fill(poseStack, x(), y(), x() + width(), y() + height(), RerollTokens.DROPDOWN_BG);
-		GuiComponent.fill(poseStack, x(), y(), x() + width(), y() + 1, RerollTokens.ACCENT_GOLD);
+		GuiComponent.fill(poseStack, x(), y(), x() + width(), y() + 1, RerollTokens.ACCENT_GOLD());
 
 		boolean operationDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION;
 		boolean targetDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS;
 		String header = operationDropdown ? "Operations" : (targetDropdown ? "Targets" : "Modifiers");
 		int headerWidth = font.width(header);
-		font.draw(poseStack, header, x() + width() / 2 - headerWidth / 2, y() + 3, RerollTokens.ACCENT_GOLD);
+		font.draw(poseStack, header, x() + width() / 2 - headerWidth / 2, y() + 3, RerollTokens.ACCENT_GOLD());
 
 		int count = getItemCount();
 		int visible = layout.dropdownVisibleItems;
@@ -96,9 +96,9 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 		boolean canScrollUp = scrollable && state.dropdownScroll() > 0;
 		boolean canScrollDown = scrollable && state.dropdownScroll() < count - visible;
 		drawTriangle(poseStack, x() + 7, y() + 6, true,
-				canScrollUp ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED);
+				canScrollUp ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);
 		drawTriangle(poseStack, x() + width() - 7, y() + 6, false,
-				canScrollDown ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED);
+				canScrollDown ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);
 
 		for (int slot = 0; slot < visible; slot++) {
 			int index = state.dropdownScroll() + slot;
@@ -130,18 +130,18 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 					removeZone ? RerollTokens.DROPDOWN_REMOVE_HOVER : RerollTokens.ROW_HOVER);
 		}
 
-		int baseColor = current ? RerollTokens.ACCENT_GOLD
-				: (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED);
+		int baseColor = current ? RerollTokens.ACCENT_GOLD()
+				: (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);
 
 		if (current || (!targetDropdown && !operationDropdown && isWatchedItem(index))) {
 			font.draw(poseStack, targetDropdown || operationDropdown ? ">" : "*",
-					x() + 2, itemY + 3, RerollTokens.ACCENT_GOLD);
+					x() + 2, itemY + 3, RerollTokens.ACCENT_GOLD());
 		}
 
 		if (targetDropdown && AutoRerollEngine.getInstance().isRunning() && index < state.targets().size()) {
 			boolean met = AutoRerollEngine.getInstance().isMet(index);
 			font.draw(poseStack, met ? "[x]" : "[ ]", x() + 2, itemY + 3,
-					met ? RerollTokens.STATE_SUCCESS : RerollTokens.STATE_DANGER);
+					met ? RerollTokens.STATE_SUCCESS() : RerollTokens.STATE_DANGER());
 		}
 
 		int rangeWidth = range.isEmpty() ? 0 : font.width(range);
@@ -159,7 +159,7 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 		}
 
 		if (removeZone) {
-			font.draw(poseStack, "x", x() + width() - 12, itemY + 3, RerollTokens.STATE_DANGER);
+			font.draw(poseStack, "x", x() + width() - 12, itemY + 3, RerollTokens.STATE_DANGER());
 		}
 	}
 

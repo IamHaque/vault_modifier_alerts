@@ -56,7 +56,7 @@ public class ToggleRowElement extends AbstractSpatialElement<ToggleRowElement>
 		icon.blit(poseStack, x() + RerollPanelLayout.PAD_X, y() + 1);
 		net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
 		font.draw(poseStack, label, x() + 26, y() + 3,
-				enabled ? RerollTokens.TEXT_DEFAULT : RerollTokens.TEXT_DISABLED);
+				enabled ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);
 	}
 
 	@Override
