@@ -172,8 +172,8 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 				});
 		startButton.setFont(net.minecraft.client.Minecraft.getInstance().font);
 		startButton.layout((screenSize, gui, parent, world) -> {
-			world.positionXY(parent.x() + RerollPanelLayout.PAD_X, parent.y() + buttonY);
-			world.width(parent.width() - 2 * RerollPanelLayout.PAD_X);
+			world.positionXY(parent.x(), parent.y() + buttonY);
+			world.width(parent.width());
 		});
 		instance.addElement(startButton);
 

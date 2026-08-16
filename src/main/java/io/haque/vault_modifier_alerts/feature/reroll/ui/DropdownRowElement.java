@@ -86,9 +86,9 @@ public class DropdownRowElement extends AbstractSpatialElement<DropdownRowElemen
 		boolean rowHovered = hovered && !chipHovered && !clearHovered;
 
 		if (open) {
-			GuiComponent.fill(poseStack, x, y, x + w, y + h, RerollTokens.ROW_OPEN);
+			GuiComponent.fill(poseStack, x + 1, y, x + w - 1, y + h, RerollTokens.ROW_OPEN);
 		} else if (mode == RerollPanelState.DropdownMode.TARGETS ? rowHovered : hovered) {
-			GuiComponent.fill(poseStack, x, y, x + w, y + h, RerollTokens.ROW_HOVER);
+			GuiComponent.fill(poseStack, x + 1, y, x + w - 1, y + h, RerollTokens.ROW_HOVER);
 		}
 
 		int color = enabled ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED;
@@ -113,7 +113,7 @@ public class DropdownRowElement extends AbstractSpatialElement<DropdownRowElemen
 			int xColor = clearHovered ? RerollTokens.STATE_DANGER()
 					: (enabled ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED);
 			font.draw(poseStack, "x", x + w - 35, y + 3, xColor);
-			GuiComponent.fill(poseStack, x + w - 24, y, x + w, y + h,
+			GuiComponent.fill(poseStack, x + w - 24, y, x + w - 1, y + h,
 					chipHovered ? RerollTokens.ROW_HOVER : RerollTokens.DROPDOWN_BG);
 			int chipColor = chipHovered ? RerollTokens.ACCENT_GOLD()
 					: (enabled ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED);

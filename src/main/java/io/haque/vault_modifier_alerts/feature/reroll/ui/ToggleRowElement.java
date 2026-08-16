@@ -47,7 +47,7 @@ public class ToggleRowElement extends AbstractSpatialElement<ToggleRowElement>
 		boolean enabled = state.get();
 		boolean hovered = containsMouse(mouseX, mouseY);
 		if (hovered) {
-			GuiComponent.fill(poseStack, x(), y(), x() + width(),
+			GuiComponent.fill(poseStack, x() + 1, y(), x() + width() - 1,
 					y() + height(), RerollTokens.ROW_HOVER);
 		}
 		TextureAtlasRegion icon = enabled

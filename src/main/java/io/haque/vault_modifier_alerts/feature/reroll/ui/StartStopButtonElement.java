@@ -3,7 +3,9 @@ package io.haque.vault_modifier_alerts.feature.reroll.ui;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelState;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
+import iskallia.vault.client.atlas.TextureAtlasRegion;
 import iskallia.vault.client.gui.framework.element.ButtonElement;
+import iskallia.vault.client.gui.framework.render.NineSlice;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
 import net.minecraft.client.gui.Font;
@@ -14,8 +16,14 @@ import net.minecraft.client.gui.Font;
  * texture. The label changes between "Start" and "Stop" depending on
  * engine state, and the button is visually disabled when neither action
  * is available.
+ *
+ * <p>The host's {@link ButtonElement#render} blits the button texture at its
+ * native 16px size, so this class overrides render to draw the texture
+ * 9-sliced across the element's full size instead.</p>
  */
 public class StartStopButtonElement extends ButtonElement<StartStopButtonElement> {
+
+	private static final NineSlice.Slices SLICES = NineSlice.slice(4, 4, 4, 4);
 
 	private final RerollPanelState state;
 	private Font font;
@@ -44,7 +52,9 @@ public class StartStopButtonElement extends ButtonElement<StartStopButtonElement
 		if (!isVisible()) {
 			return;
 		}
-		super.render(renderer, poseStack, mouseX, mouseY, partialTick);
+		TextureAtlasRegion region = textures.selectTexture(isDisabled(), containsMouse(mouseX, mouseY), clickHeld);
+		renderer.render(NineSlice.TextureRegion.of(region.atlas(), region.resourceLocation(), SLICES),
+				poseStack, worldSpatial);
 		if (font == null) {
 			return;
 		}

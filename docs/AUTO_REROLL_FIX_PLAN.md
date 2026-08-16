@@ -174,13 +174,36 @@ and `VMA_Reroll_Panel_Rewrite_Plan.md`.
 
 ## 6. QA status — in-game verification still required
 
+### QA round 1 (owner, 2026-08-16) — issues found and fixed
+
+1. **Hover/open row fill covered the 1px side borders** — fills now inset by 1px
+   (`x+1 .. x+width-1`) in `DropdownRowElement` (row + Targets chip) and
+   `ToggleRowElement`.
+2. **Slot items painted over the panel** — root cause: `renderSlotItems`
+   delegates to vanilla `AbstractContainerScreen.render`, which draws item
+   icons at z=100 (1.18.2 `ItemRenderer`). The panel re-render now runs at
+   z=200 in the mixin (`poseStack.translate(0,0,200)`), below tooltips (z=400).
+3. **`-`/`+` steppers bled outside their 12px box / next row** — host
+   `ButtonElement.render` blits the texture at its native 16px. `StepperButtonElement`
+   now stretches the selected texture across its own bounds; glyph color fixed
+   (TEXT_DEFAULT enabled / TEXT_DISABLED disabled).
+4. **Start/Stop button only 16px** — same native-blit cause; now full-width row
+   (drops the PAD_X inset) rendered 9-sliced
+   (`NineSlice.TextureRegion.of(region.atlas(), region.resourceLocation(), slice(4,4,4,4))`).
+5. Slot **tooltips** intentionally remain above the panel (z=400) — vanilla
+   behavior, not a bug.
+
+### Open in-game QA (after the fixes above)
+
+Run the per-row checklist (§4): LEFT + RIGHT panel side, GUI-scale resize, row
+renders inside panel bounds in order at correct width, click at rendered
+location works / click at screen top-left does nothing, slot tooltip overlap
+keeps panel on top, dropdown open/close on all three rows, stepper + Min field
+interactions (numeric and non-numeric targets), and the start/stop button
+tooltip.
+
 All fixes through commit `d3b6d131` are build-validated but **not yet verified
-in-game**. Before releasing, run the per-row checklist (§4): LEFT + RIGHT panel
-side, GUI-scale resize, row renders inside panel bounds in order at correct
-width, click at rendered location works / click at screen top-left does nothing,
-slot tooltip overlap keeps panel on top, dropdown open/close on all three rows,
-stepper + Min field interactions (numeric and non-numeric targets), and the
-start/stop button tooltip.
+in-game**.
 
 ## Commit discipline
 

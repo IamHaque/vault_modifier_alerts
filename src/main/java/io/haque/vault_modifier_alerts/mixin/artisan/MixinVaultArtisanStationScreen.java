@@ -61,21 +61,27 @@ public abstract class MixinVaultArtisanStationScreen extends AbstractElementCont
 	}
 
 	/**
-	 * Re-renders the auto-reroll panel just before the screen's tooltip pass,
-	 * above the slot items the framework painted over it. Injecting at the HEAD
-	 * of renderTooltips (instead of the TAIL of the render) keeps the panel's
-	 * own element tooltips on top of the second pass. The full element render is
-	 * re-run (legacy rows plus converted element children), so future row
-	 * conversions inherit the z-order fix automatically. require=0: the element
-	 * already draws the panel in the framework pass, so a failure here only
-	 * loses the z-order improvement, never the panel itself.
+	 * Re-renders the auto-reroll panel just before the screen's tooltip pass.
+	 * The framework draws the panel in renderElements (z=0) but the vanilla
+	 * render inside renderSlotItems paints item icons at z=100 over it, so the
+	 * second pass runs at z=200 — above slot items, below tooltips (z=400).
+	 * Injecting at the HEAD of renderTooltips (instead of the TAIL of the
+	 * render) keeps the panel's own element tooltips on top of the second pass.
+	 * The full element render is re-run (legacy rows plus converted element
+	 * children), so future row conversions inherit the z-order fix
+	 * automatically. require=0: the element already draws the panel in the
+	 * framework pass, so a failure here only loses the z-order improvement,
+	 * never the panel itself.
 	 */
 	@Inject(method = "renderTooltips", at = @At("HEAD"), require = 0)
 	private void vma$renderPanelOnTop(PoseStack poseStack, int mouseX, int mouseY, CallbackInfo ci) {
 		try {
 			RerollPanelElement element = RerollPanelElement.getInstance();
 			if (element != null && element.isVisible()) {
+				poseStack.pushPose();
+				poseStack.translate(0.0D, 0.0D, 200.0D);
 				element.render(elementRenderer, poseStack, mouseX, mouseY, 0f);
+				poseStack.popPose();
 			}
 		} catch (Throwable t) {
 			VaultModifierAlerts.LOGGER.warn("[VMA] Failed to re-draw auto-reroll panel on top", t);
