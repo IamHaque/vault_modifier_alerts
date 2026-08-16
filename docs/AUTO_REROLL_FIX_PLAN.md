@@ -132,7 +132,8 @@ compile (`./gradlew compileJava`).
   required in-game** (side flips, resize, click-outside, tooltip overlap).
 - **3.3 `DropdownListElement` internals**: migrate to
   `VerticalScrollClipContainer` + per-row elements (host scrollbar math).
-  **Deferred**: largest single piece; requires in-game QA before proceeding.
+  **Deferred**: largest single piece; **explicitly gated on in-game QA of the
+  current build** (owner decision 2026-08-16) before implementation starts.
 - **3.4 Tooltip unification**: delete the manual popover
   (`hoverTooltip`/`drawTooltip`/`pendingTooltip`, `TOOLTIP_BG`) once no
   hand-drawn rows remain. Partially done — the three converted rows no longer
@@ -155,9 +156,9 @@ Recorded here because `docs/DECISIONS.md` and `docs/F3_AUTO_REROLL_PLAN.md`
 in-repo design docs are `DESIGN_GUIDELINES.md`, `QOLHunters_Design_Guidelines.md`
 and `VMA_Reroll_Panel_Rewrite_Plan.md`.
 
-- **DEC-032a `tickInterval` default**: stays `4`. The "15" value from
-  DEC-025/F3-plan could not be found in any in-repo doc; no change without
-  evidence. **Question to owner**: is the DEC-025 value 15 or 4?
+- **DEC-032a `tickInterval` default**: stays `4` (owner-confirmed 2026-08-16).
+  The "15" value from DEC-025/F3-plan could not be found in any in-repo doc;
+  no change without evidence. **Resolved: keep 4.**
 - **DEC-032b Min field stays state-driven**: `TextInputElement` was
   rejected — the framework does not route keyboard/char events to owned
   elements (input path is screen-event-driven by design). Blink cursor,
