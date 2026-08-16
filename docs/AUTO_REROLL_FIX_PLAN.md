@@ -205,6 +205,30 @@ and `VMA_Reroll_Panel_Rewrite_Plan.md`.
 5. Slot **tooltips** intentionally remain above the panel (z=400) — vanilla
    behavior, not a bug.
 
+### QA round 2 (owner, 2026-08-16) — issues found and fixed
+
+1. **Scrollbar handle shown even when the list fits** (2/4 items) — root cause:
+   `VerticalScrollbarElement.render` always draws a handle
+   (`SCROLLBAR_HANDLE` enabled / `SCROLLBAR_HANDLE_DISABLED` when not); the
+   VSCC disables it correctly on non-overflow, but the disabled handle texture
+   still renders. The dropdown now hides the scrollbar element entirely when it
+   is not enabled (render-time sync of `setVisible` to `isEnabled`).
+2. **`-`/`+`, Start/Stop and the toggle icons took more than their row's space**
+   — root cause: `ButtonElement`'s ctor ignores the passed spatial and re-sizes
+   the element to the texture's native 16x16, and the layout lambdas only set
+   position. The stepper and Start/Stop layout lambdas now set explicit sizes
+   (12x12 and full-width x `BUTTON_H`); the toggle icons are blitted at 12x12
+   (IPosition/ISize overload) instead of native 16px in a 14px row.
+3. **Status text stayed on "Rolling #0 - 0/2 met" during a run** — the display
+   path is verified live per frame (StatusRowElement → computeStatusInfo; the
+   old debounce from `c1e97d36`/`7f2a5dd3` is gone), so a frozen "#0" means the
+   engine ran with `rolls() == 0` — i.e. only auto-reset presses happened
+   (they don't count as rolls). `runningStatus` now appends
+   `(reset x N)` when the engine auto-reset potential, making that state
+   visible. **Shelf / next QA**: confirm the reset-loop hypothesis with one
+   run under debug logging (per-roll logs record every press, reset and
+   result); if confirmed, the engine's out-of-potential path is the next fix.
+
 ### Open in-game QA (after the fixes above)
 
 Run the per-row checklist (§4): LEFT + RIGHT panel side, GUI-scale resize, row
@@ -217,9 +241,9 @@ scrollbar (drag handle, wheel anywhere over the open dropdown, Up/Down keys),
 scroll resets on mode change and on reopen, click-outside closes, and the
 remove-zone hover `x` still works at the row's right edge.
 
-All fixes through commit `0e545e75` are build-validated but **not yet verified
-in-game**; P3.3 (`DropdownListElement` rewrite) is build-validated and also
-awaits in-game QA.
+All fixes through `09bc9ce5` are build-validated but **not yet verified
+in-game**; the QA round 2 fixes above are build-validated and await the next
+QA session.
 
 ## Commit discipline
 

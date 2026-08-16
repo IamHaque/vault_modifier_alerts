@@ -79,6 +79,7 @@ public class DropdownListElement extends VerticalScrollClipContainer<DropdownLis
 			verticalScrollBarElement.setValue(0f);
 		}
 		refreshRowsIfNeeded();
+		verticalScrollBarElement.setVisible(verticalScrollBarElement.isEnabled());
 		super.render(renderer, poseStack, mouseX, mouseY, partialTick);
 
 		Font font = Minecraft.getInstance().font;

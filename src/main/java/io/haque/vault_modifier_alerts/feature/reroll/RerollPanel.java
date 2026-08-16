@@ -470,6 +470,9 @@ public final class RerollPanel {
 
 	String runningStatus(AutoRerollEngine engine) {
 		String base = "Rolling #" + engine.rolls();
+		String resets = engine.potentialResetsThisSession() > 0
+				? " (reset x " + engine.potentialResetsThisSession() + ")"
+				: "";
 		if (state.targets().size() <= 1) {
 			RollTarget target = state.focusedTarget() >= 0 && state.focusedTarget() < state.targets().size()
 					? state.targets().get(state.focusedTarget())
@@ -478,17 +481,17 @@ public final class RerollPanel {
 			if (target != null && value > 0) {
 				boolean percent = currentTargetRange().percent();
 				if (target.thresholdEnabled()) {
-					return base + " - " + formatDisplay(value, percent) + " >="
+					return base + resets + " - " + formatDisplay(value, percent) + " >="
 							+ formatDisplay(target.thresholdValue(), percent)
 							+ (engine.isMet(0) ? " [x]" : " [ ]");
 				}
-				return base + " - " + formatDisplay(value, percent);
+				return base + resets + " - " + formatDisplay(value, percent);
 			}
-			return base;
+			return base + resets;
 		}
 		int met = engine.metCount();
 		String label = engine.stopCondition() == AutoRerollEngine.StopCondition.ALL ? " met" : " passing";
-		return base + " - " + met + "/" + state.targets().size() + label;
+		return base + resets + " - " + met + "/" + state.targets().size() + label;
 	}
 
 	String targetDetail(AutoRerollEngine engine) {

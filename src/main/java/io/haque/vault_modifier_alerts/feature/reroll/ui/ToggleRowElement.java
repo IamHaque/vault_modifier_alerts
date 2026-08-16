@@ -53,7 +53,9 @@ public class ToggleRowElement extends AbstractSpatialElement<ToggleRowElement>
 		TextureAtlasRegion icon = enabled
 				? (hovered ? ScreenTextures.BUTTON_TOGGLE_ON_HOVER : ScreenTextures.BUTTON_TOGGLE_ON)
 				: (hovered ? ScreenTextures.BUTTON_TOGGLE_OFF_HOVER : ScreenTextures.BUTTON_TOGGLE_OFF);
-		icon.blit(poseStack, x() + RerollPanelLayout.PAD_X, y() + 1);
+		icon.blit(poseStack,
+				Spatials.positionXY(x() + RerollPanelLayout.PAD_X, y() + 1),
+				Spatials.size(12, 12));
 		net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
 		font.draw(poseStack, label, x() + 26, y() + 3,
 				enabled ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);

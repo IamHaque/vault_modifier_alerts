@@ -85,6 +85,8 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 				() -> minState.stepMin(-minState.currentStep()));
 		decButton.layout((screenSize, gui, parent, world) -> {
 			world.positionXY(parent.x() + 2, parent.y() + minY + 2);
+			world.width(12);
+			world.height(12);
 		});
 		decButton.setDisabled(() -> !VmaClientConfigs.isAutoRerollEnabled()
 				|| !panel.currentTargetRange().numeric());
@@ -95,6 +97,8 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 				() -> minState.stepMin(minState.currentStep()));
 		incButton.layout((screenSize, gui, parent, world) -> {
 			world.positionXY(parent.x() + parent.width() - 14, parent.y() + minY + 2);
+			world.width(12);
+			world.height(12);
 		});
 		incButton.setDisabled(() -> !VmaClientConfigs.isAutoRerollEnabled()
 				|| !panel.currentTargetRange().numeric());
@@ -175,6 +179,7 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 		startButton.layout((screenSize, gui, parent, world) -> {
 			world.positionXY(parent.x(), parent.y() + buttonY);
 			world.width(parent.width());
+			world.height(RerollPanelLayout.BUTTON_H);
 		});
 		instance.addElement(startButton);
 
