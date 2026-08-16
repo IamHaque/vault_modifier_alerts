@@ -8,6 +8,7 @@ import io.haque.vault_modifier_alerts.feature.reroll.ui.StartStopButtonElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StatusRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.ToggleRowElement;
 import iskallia.vault.client.gui.framework.element.ContainerElement;
+import iskallia.vault.client.gui.framework.element.spi.AbstractSpatialElement;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
@@ -24,9 +25,9 @@ import net.minecraft.util.Mth;
  * unconverted rows are still drawn by {@link RerollPanel#draw}; converted rows
  * are rendered as real framework children by the container's own render pass.</p>
  *
- * <p>The mixin re-draws the panel at the TAIL of the screen render, above slot
- * items and tooltips. The second pass paints the same pixels, so the double draw
- * is invisible; it only matters when slot items overlap the panel.</p>
+ * <p>The mixin re-draws the panel just before the screen's tooltip pass, above
+ * slot items and tooltips. The second pass paints the same pixels, so the double
+ * draw is invisible; it only matters when slot items overlap the panel.</p>
  */
 public final class RerollPanelElement extends ContainerElement<RerollPanelElement> {
 
@@ -89,10 +90,7 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 						}
 					}
 				});
-		rerollToggle.layout((screenSize, gui, parent, world) -> {
-			world.positionXY(0, rerollToggleY);
-			world.width(parent.width());
-		});
+		anchorRow(rerollToggle, rerollToggleY);
 		instance.addElement(rerollToggle);
 
 		// Auto-reset toggle (row 9)
@@ -105,10 +103,7 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 					RerollPanelState.getInstance().loseMinFocus();
 					VmaClientConfigs.setAutoResetPotential(!VmaClientConfigs.isAutoResetPotentialEnabled());
 				});
-		resetToggle.layout((screenSize, gui, parent, world) -> {
-			world.positionXY(0, resetToggleY);
-			world.width(parent.width());
-		});
+		anchorRow(resetToggle, resetToggleY);
 		instance.addElement(resetToggle);
 
 		// Start/stop button (row 10)
@@ -131,7 +126,7 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 				});
 		startButton.setFont(net.minecraft.client.Minecraft.getInstance().font);
 		startButton.layout((screenSize, gui, parent, world) -> {
-			world.positionXY(RerollPanelLayout.PAD_X, buttonY);
+			world.positionXY(parent.x() + RerollPanelLayout.PAD_X, parent.y() + buttonY);
 			world.width(parent.width() - 2 * RerollPanelLayout.PAD_X);
 		});
 		instance.addElement(startButton);
@@ -140,20 +135,14 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 		int statusY = buttonY + RerollPanelLayout.BUTTON_H;
 		StatusRowElement statusRow = new StatusRowElement(0, statusY, RerollPanelLayout.WIDTH);
 		statusRow.setFont(net.minecraft.client.Minecraft.getInstance().font);
-		statusRow.layout((screenSize, gui, parent, world) -> {
-			world.positionXY(0, statusY);
-			world.width(parent.width());
-		});
+		anchorRow(statusRow, statusY);
 		instance.addElement(statusRow);
 
 		// Counter row (row 12)
 		int counterY = statusY + RerollPanelLayout.ROW_H;
 		CounterRowElement counterRow = new CounterRowElement(0, counterY, RerollPanelLayout.WIDTH);
 		counterRow.setFont(net.minecraft.client.Minecraft.getInstance().font);
-		counterRow.layout((screenSize, gui, parent, world) -> {
-			world.positionXY(0, counterY);
-			world.width(parent.width());
-		});
+		anchorRow(counterRow, counterY);
 		instance.addElement(counterRow);
 
 		// Dropdown list
@@ -213,5 +202,21 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 			setHeight(height);
 			screen.requestLayout();
 		}
+	}
+
+	/**
+	 * Anchors a full-width child row to the panel's own resolved position at
+	 * the given local (panel-relative) Y offset. All simple full-width rows
+	 * (toggles, buttons, labels) must use this instead of calling
+	 * {@code world.positionXY(...)} directly: the framework only pre-translates
+	 * the world spatial by the parent, and the layout lambda then overwrites it,
+	 * so rows must fold {@code parent.x()/parent.y()} in themselves or they
+	 * render pinned to the top-left of the screen.
+	 */
+	private static void anchorRow(AbstractSpatialElement<?> child, int localY) {
+		child.layout((screenSize, gui, parent, world) -> {
+			world.positionXY(parent.x(), parent.y() + localY);
+			world.width(parent.width());
+		});
 	}
 }
