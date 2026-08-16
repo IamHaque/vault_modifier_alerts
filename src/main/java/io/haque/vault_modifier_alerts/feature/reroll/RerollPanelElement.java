@@ -5,6 +5,7 @@ import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.CounterRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.DropdownListElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.DropdownRowElement;
+import io.haque.vault_modifier_alerts.feature.reroll.ui.StepperButtonElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StartStopButtonElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StatusRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.ToggleRowElement;
@@ -72,6 +73,31 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 				instance.setWidth(width);
 			}
 		});
+
+		// Min row steppers (row 4) — the field itself stays state-driven
+		// (framework does not route keyboard input to owned elements)
+		int minY = RerollPanelLayout.TITLE_H + 3 * RerollPanelLayout.ROW_H;
+		RerollPanel panel = RerollPanel.getInstance();
+		RerollPanelState minState = RerollPanelState.getInstance();
+		StepperButtonElement decButton = new StepperButtonElement(
+				0, minY, 12, 12, "-",
+				() -> minState.stepMin(-minState.currentStep()));
+		decButton.layout((screenSize, gui, parent, world) -> {
+			world.positionXY(parent.x() + 2, parent.y() + minY + 2);
+		});
+		decButton.setDisabled(() -> !VmaClientConfigs.isAutoRerollEnabled()
+				|| !panel.currentTargetRange().numeric());
+		instance.addElement(decButton);
+
+		StepperButtonElement incButton = new StepperButtonElement(
+				0, minY, 12, 12, "+",
+				() -> minState.stepMin(minState.currentStep()));
+		incButton.layout((screenSize, gui, parent, world) -> {
+			world.positionXY(parent.x() + parent.width() - 14, parent.y() + minY + 2);
+		});
+		incButton.setDisabled(() -> !VmaClientConfigs.isAutoRerollEnabled()
+				|| !panel.currentTargetRange().numeric());
+		instance.addElement(incButton);
 
 		// Dropdown rows (rows 1-3: Focus, Modifier, Targets)
 		DropdownRowElement focusRow = new DropdownRowElement(

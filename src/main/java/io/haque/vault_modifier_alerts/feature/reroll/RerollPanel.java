@@ -423,23 +423,11 @@ public final class RerollPanel {
 	private void drawMinRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX, int mouseY) {
 		RollRange range = currentTargetRange();
 		boolean numeric = range.numeric();
-		boolean enabled = VmaClientConfigs.isAutoRerollEnabled() && numeric;
 		boolean hasTarget = state.focusedTarget() >= 0 && state.focusedTarget() < state.targets().size();
-		boolean hoveredDec = rowHovered(layout, mouseX, mouseY, layout.minY, RerollPanelLayout.ROW_H)
-				&& mouseX < x + 16;
-		boolean hoveredInc = rowHovered(layout, mouseX, mouseY, layout.minY, RerollPanelLayout.ROW_H)
-				&& mouseX >= x + width - 16;
 		boolean hoveredField = rowHovered(layout, mouseX, mouseY, layout.minY, RerollPanelLayout.ROW_H)
 				&& mouseX >= layout.minFieldLeft() && mouseX < layout.minFieldRight();
 		boolean hasThreshold = hasTarget
 				&& state.targets().get(state.focusedTarget()).thresholdEnabled();
-		int buttonColor = enabled ? (hoveredDec ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_MUTED) : RerollTokens.TEXT_DISABLED;
-		GuiComponent.fill(poseStack, x + 2, layout.minY + 2, x + 14, layout.minY + 12,
-				enabled ? (hoveredDec ? RerollTokens.ROW_HOVER : RerollTokens.BUTTON_BG) : RerollTokens.BUTTON_DISABLED_BG);
-		GuiComponent.fill(poseStack, x + width - 14, layout.minY + 2, x + width - 2, layout.minY + 12,
-				enabled ? (hoveredInc ? RerollTokens.ROW_HOVER : RerollTokens.BUTTON_BG) : RerollTokens.BUTTON_DISABLED_BG);
-		drawCentered(poseStack, "-", x + 8, layout.minY + 3, buttonColor);
-		drawCentered(poseStack, "+", x + width - 8, layout.minY + 3, buttonColor);
 		drawString(poseStack, "Min", x + 22, layout.minY + 3, RerollTokens.TEXT_MUTED);
 		if (state.isMinInputFocused() || hasThreshold) {
 			GuiComponent.fill(poseStack, layout.minFieldLeft(), layout.minY, layout.minFieldRight(),

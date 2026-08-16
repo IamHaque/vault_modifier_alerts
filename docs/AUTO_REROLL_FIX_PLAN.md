@@ -13,7 +13,7 @@ then P1 correctness, then the remaining Phase 3 conversions and polish.
 | 0.3   | Host API verification (done at bytecode level) + compile gate | Done (compile passes) |
 | 1     | compactMode removal; debounce ticks; P-key guard; config comments | Done |
 | 2     | Non-numeric Min guard; canStart ops; Start tooltip; candidates memo; doc drift | Done (doc drift: value kept, question recorded in DEC-032) |
-| 3     | Row conversions (Min stepper → real elements; DropdownRowElement; dropdown internals; tooltip unification) | Partial: 3.2 done; 3.1 steppers + 3.3 remain |
+| 3     | Row conversions (Min stepper → real elements; DropdownRowElement; dropdown internals; tooltip unification) | Partial: 3.1 steppers + 3.2 done; 3.3 remains |
 | 4     | Glyph cleanup; per-row QA checklist; DEC-032 docs | Partial (⌄ chevron shipped with 3.2) |
 
 ## Baseline findings (bytecode-verified against `libs/the_vault-...jar`)
@@ -112,12 +112,15 @@ compile (`./gradlew compileJava`).
 - **3.1 Min stepper**: two small `ButtonElement`s (`BUTTON_EMPTY_16_TEXTURES`)
   + numeric-filtered `TextInputElement<T>` subclass; host cursor replaces the
   manual blink timer. Preserve right-click clear, Enter/Esc commit, `.` once.
-  **Done in part**: state-level numeric guards shipped in P2. The stepper
-  buttons themselves can become `ButtonElement`s, but the field **cannot** use
-  `TextInputElement`: the framework does not route keyboard/char events to
-  owned elements (input is screen-event-driven via `ClientTickEvents` +
-  `RerollPanelState` by design). Keep the state-machine field; only the visual
-  `-`/`+` chrome is element-eligible.
+  **Done in part**: the `-`/`+` steppers are now `StepperButtonElement`
+  (`ButtonElement` + atlas textures, 12x12, disabled when non-numeric or
+  auto-reroll off); legacy button fills removed from `drawMinRow`. The field
+  **cannot** use `TextInputElement`: the framework does not route keyboard/char
+  events to owned elements (input is screen-event-driven via
+  `ClientTickEvents` + `RerollPanelState` by design). Keep the state-machine
+  field (blink cursor, right-click clear, Enter/Esc, `.` once stay).
+  RegionAt 16px stepper zones retained — with 12px buttons the outer 2px
+  still step via `handleClick`, preserving today's effective hit area.
 - **3.2 Focus/Modifier/Targets rows**: one parameterized `DropdownRowElement`;
   Targets chip (`any`/`all`) + clear `x` as right-edge child buttons; triangle →
   `⌄` chevron. **Done** (`ui/DropdownRowElement.java`): rows are real container

@@ -1,0 +1,40 @@
+package io.haque.vault_modifier_alerts.feature.reroll.ui;
+
+import com.mojang.blaze3d.vertex.PoseStack;
+import iskallia.vault.client.gui.framework.element.ButtonElement;
+import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
+import iskallia.vault.client.gui.framework.spatial.Spatials;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+
+/**
+ * A small stepper button ("-" / "+") rendered as a real {@link ButtonElement}
+ * with the host's 16px button texture and a centered glyph, replacing the
+ * hand-drawn fills in {@code drawMinRow()}. Disabled when the focused target's
+ * range is non-numeric or auto-reroll is off; the state-level guards in
+ * {@link io.haque.vault_modifier_alerts.feature.reroll.RerollPanelState}
+ * still backstop the click path.
+ */
+public class StepperButtonElement extends ButtonElement<StepperButtonElement> {
+
+	private final String glyph;
+
+	public StepperButtonElement(int x, int y, int width, int height, String glyph, Runnable onClick) {
+		super(Spatials.size(width, height), RerollTokens.START_BUTTON_TEXTURES, onClick);
+		this.glyph = glyph;
+	}
+
+	@Override
+	public void render(IElementRenderer renderer, PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+		if (!isVisible()) {
+			return;
+		}
+		super.render(renderer, poseStack, mouseX, mouseY, partialTick);
+		Font font = Minecraft.getInstance().font;
+		int color = isDisabled()
+				? RerollTokens.TEXT_DISABLED
+				: (containsMouse(mouseX, mouseY) ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_MUTED);
+		int textWidth = font.width(glyph);
+		font.draw(poseStack, glyph, x() + width() / 2 - textWidth / 2.0f, y() + (height() - 8) / 2, color);
+	}
+}
