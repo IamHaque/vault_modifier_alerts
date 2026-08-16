@@ -58,13 +58,16 @@ public final class VmaClientCommands {
 
 	private static int setRerollEnabled(CommandSourceStack source, boolean value) {
 		VmaClientConfigs.setAutoRerollEnabled(value);
+		VmaClientConfigs.setRerollPanelEnabled(value);
+		RerollPanel.getInstance().setVisible(value);
 		if (!value) {
 			AutoRerollEngine.getInstance().cancelResume();
 			if (AutoRerollEngine.getInstance().isRunning()) {
 				AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
 			}
 		}
-		source.sendSuccess(new TextComponent("[VMA] Auto-reroll " + (value ? "enabled" : "disabled")), false);
+		source.sendSuccess(new TextComponent("[VMA] Auto-reroll " + (value ? "enabled" : "disabled")
+				+ " (panel " + (value ? "shown" : "hidden") + ")"), false);
 		return Command.SINGLE_SUCCESS;
 	}
 
@@ -126,6 +129,7 @@ public final class VmaClientCommands {
 		lines.add("[VMA] debug: " + (VmaClientConfigs.isDebugLogging() ? "on" : "off")
 				+ ", sounds: " + (VmaClientConfigs.isAlertSoundEnabled() ? "on" : "off")
 				+ ", reroll: " + (VmaClientConfigs.isAutoRerollEnabled() ? "on" : "off")
+				+ ", panel: " + (VmaClientConfigs.isRerollPanelEnabled() ? "on" : "off")
 				+ ", hud ordering: " + (VmaClientConfigs.isHudOrderingEnabled() ? "on" : "off"));
 		if (VmaClientConfigs.isHudOrderingEnabled() && ModifierOrdering.getLastOrdered() != null) {
 			lines.add("[VMA] HUD order (first -> last): " + String.join(", ", ModifierOrdering.getLastOrdered()));

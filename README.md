@@ -69,6 +69,8 @@ warns once and stays silent.
 | `/vma debug off`    | Disables debug logging.                                                                                    |
 | `/vma sound on`     | Enables expiry alert sounds (writes `alertSoundEnabled=true`; persists across restarts).                   |
 | `/vma sound off`    | Silences expiry alerts (firing state still tracked; no audio).                                             |
+| `/vma reroll enable` | Enables auto-rerolling and shows the side panel (writes `enabled=true` for both `[Auto Reroll]` and `[Reroll Panel]`; persists across restarts). |
+| `/vma reroll disable` | Master off-switch: stops any running auto-reroll, hides the side panel, and disables both toggles (persists across restarts). |
 | `/vma reroll start` | Starts auto-rerolling with the panel's current operation + target selection.                               |
 | `/vma reroll stop`  | Stops the running auto-reroll.                                                                             |
 | `/vma status`       | Prints config state, the last observed HUD modifier order, vault/frame state, and each watched id's status. |

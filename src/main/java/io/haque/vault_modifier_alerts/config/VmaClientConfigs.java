@@ -233,6 +233,10 @@ public final class VmaClientConfigs {
 		return REROLL_PANEL_ENABLED.get();
 	}
 
+	public static void setRerollPanelEnabled(boolean value) {
+		REROLL_PANEL_ENABLED.set(value);
+	}
+
 	public static String rerollPanelSide() {
 		return REROLL_PANEL_SIDE.get();
 	}
