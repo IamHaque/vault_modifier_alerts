@@ -14,7 +14,7 @@ then P1 correctness, then the remaining Phase 3 conversions and polish.
 | 1     | compactMode removal; debounce ticks; P-key guard; config comments | Done |
 | 2     | Non-numeric Min guard; canStart ops; Start tooltip; candidates memo; doc drift | Done (doc drift: value kept, question recorded in DEC-032) |
 | 3     | Row conversions (Min stepper → real elements; DropdownRowElement; dropdown internals; tooltip unification) | Partial: 3.1 steppers + 3.2 done; 3.3 remains |
-| 4     | Glyph cleanup; per-row QA checklist; DEC-032 docs | Partial (⌄ chevron shipped with 3.2) |
+| 4     | Glyph cleanup; per-row QA checklist; DEC-032 docs | Partial (⌄ chevron; DEC-032 recorded; `[x]`/`[ ]` kept as text — DEC-032d) |
 
 ## Baseline findings (bytecode-verified against `libs/the_vault-...jar`)
 
@@ -147,6 +147,39 @@ compile (`./gradlew compileJava`).
   rendered location works / click at screen top-left does nothing; slot
   tooltip overlap keeps panel on top.
 - `DECISIONS.md` DEC-032; supersede notes in `F3_AUTO_REROLL_PLAN.md` §4.4.
+
+## 5. DEC-032 — decisions log (no `DECISIONS.md` exists in this repo)
+
+Recorded here because `docs/DECISIONS.md` and `docs/F3_AUTO_REROLL_PLAN.md`
+(referenced by the earlier plans) do not exist in this repository; the only
+in-repo design docs are `DESIGN_GUIDELINES.md`, `QOLHunters_Design_Guidelines.md`
+and `VMA_Reroll_Panel_Rewrite_Plan.md`.
+
+- **DEC-032a `tickInterval` default**: stays `4`. The "15" value from
+  DEC-025/F3-plan could not be found in any in-repo doc; no change without
+  evidence. **Question to owner**: is the DEC-025 value 15 or 4?
+- **DEC-032b Min field stays state-driven**: `TextInputElement` was
+  rejected — the framework does not route keyboard/char events to owned
+  elements (input path is screen-event-driven by design). Blink cursor,
+  right-click clear, Enter/Esc commit, `.` once remain in `RerollPanelState`.
+- **DEC-032c stepper hit zones**: 16px `regionAt` zones kept alongside 12px
+  button elements; outer 2px on each side still step via `handleClick`,
+  preserving today's effective hit area (bigger than the drawn button).
+- **DEC-032d `[x]`/`[ ]` markers**: kept as text glyphs in status strings and
+  dropdown items; no verified host atlas check/cross icon to swap to. Matches
+  the existing `>`/`*` text-glyph pattern.
+- **DEC-032e `compactMode`**: removed — dead config with no observable effect
+  (both review passes recommended removal).
+
+## 6. QA status — in-game verification still required
+
+All fixes through commit `d3b6d131` are build-validated but **not yet verified
+in-game**. Before releasing, run the per-row checklist (§4): LEFT + RIGHT panel
+side, GUI-scale resize, row renders inside panel bounds in order at correct
+width, click at rendered location works / click at screen top-left does nothing,
+slot tooltip overlap keeps panel on top, dropdown open/close on all three rows,
+stepper + Min field interactions (numeric and non-numeric targets), and the
+start/stop button tooltip.
 
 ## Commit discipline
 

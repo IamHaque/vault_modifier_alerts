@@ -34,9 +34,6 @@ public final class RerollTokens {
 	public static final int INPUT_FOCUS = 0xFF484848;
 
 	// Button
-	public static final int BUTTON_BG = 0xFF303030;
-	public static final int BUTTON_DISABLED_BG = 0xFF222222;
-
 	// Start/stop button atlas textures (host's generic 16px button)
 	public static final ButtonElement.ButtonTextures START_BUTTON_TEXTURES = ScreenTextures.BUTTON_EMPTY_16_TEXTURES;
 
