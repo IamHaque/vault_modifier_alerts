@@ -12,7 +12,7 @@ then P1 correctness, then the remaining Phase 3 conversions and polish.
 | 0.2   | Z-order: re-render full element before the tooltip pass | Done |
 | 0.3   | Host API verification (done at bytecode level) + compile gate | Done (compile passes) |
 | 1     | compactMode removal; debounce ticks; P-key guard; config comments | Done |
-| 2     | Non-numeric Min guard; canStart ops; Start tooltip; candidates memo; doc drift | Pending |
+| 2     | Non-numeric Min guard; canStart ops; Start tooltip; candidates memo; doc drift | Done (doc drift: value kept, question recorded in DEC-032) |
 | 3     | Row conversions (Min stepper → real elements; DropdownRowElement; dropdown internals; tooltip unification) | Pending |
 | 4     | Glyph cleanup; per-row QA checklist; DEC-032 docs | Pending |
 

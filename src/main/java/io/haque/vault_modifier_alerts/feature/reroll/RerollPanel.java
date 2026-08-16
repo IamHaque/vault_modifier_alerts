@@ -51,6 +51,9 @@ public final class RerollPanel {
 	private int lastH;
 	private int currentWidth = RerollPanelLayout.WIDTH;
 	private ItemStack lastSeenGear = ItemStack.EMPTY;
+	private ItemStack cachedCandidatesGear = ItemStack.EMPTY;
+	private ResourceLocation cachedCandidatesOperation;
+	private List<Candidate> cachedCandidates = List.of();
 	private String pendingTooltip;
 	private int tooltipX;
 	private int tooltipY;
@@ -168,8 +171,15 @@ public final class RerollPanel {
 	}
 
 	public List<Candidate> candidates(ItemStack gear, GearModificationAction operation) {
-		return ModifierCatalog.candidates(gear,
-				ModifierCatalog.scopeOfOperation(operation.modification().getRegistryName()));
+		ResourceLocation operationId = operation.modification().getRegistryName();
+		if (ItemStack.matches(gear, cachedCandidatesGear) && operationId.equals(cachedCandidatesOperation)) {
+			return cachedCandidates;
+		}
+		cachedCandidatesGear = gear;
+		cachedCandidatesOperation = operationId;
+		cachedCandidates = List.copyOf(ModifierCatalog.candidates(gear,
+				ModifierCatalog.scopeOfOperation(operationId)));
+		return cachedCandidates;
 	}
 
 	public static ItemStack stationGear() {
@@ -534,7 +544,7 @@ public final class RerollPanel {
 	private void drawMinRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX, int mouseY) {
 		RollRange range = currentTargetRange();
 		boolean numeric = range.numeric();
-		boolean enabled = VmaClientConfigs.isAutoRerollEnabled();
+		boolean enabled = VmaClientConfigs.isAutoRerollEnabled() && numeric;
 		boolean hasTarget = state.focusedTarget() >= 0 && state.focusedTarget() < state.targets().size();
 		boolean hoveredDec = rowHovered(layout, mouseX, mouseY, layout.minY, RerollPanelLayout.ROW_H)
 				&& mouseX < x + 16;

@@ -299,6 +299,9 @@ public final class RerollPanelState {
 		if (dropdownMode != DropdownMode.NONE || focused() == null) {
 			return;
 		}
+		if (!panel.currentTargetRange().numeric()) {
+			return;
+		}
 		if (!minInputFocused) {
 			minInputText = focused().thresholdEnabled()
 					? RerollPanel.formatDisplay(focused().thresholdValue(), false)
@@ -322,12 +325,10 @@ public final class RerollPanelState {
 			return;
 		}
 		RollRange range = panel.currentTargetRange();
-		double value;
-		if (range.numeric()) {
-			value = Mth.clamp(thresholdValue() + delta, range.min(), range.max());
-		} else {
-			value = Math.max(0.0, thresholdValue() + delta);
+		if (!range.numeric()) {
+			return;
 		}
+		double value = Mth.clamp(thresholdValue() + delta, range.min(), range.max());
 		setFocusedThreshold(true, value);
 		minInputText = RerollPanel.formatDisplay(thresholdValue(), false);
 		minInputFocused = false;
@@ -365,7 +366,7 @@ public final class RerollPanelState {
 	}
 
 	public boolean canStart() {
-		return VmaClientConfigs.isAutoRerollEnabled() && !targets.isEmpty();
+		return VmaClientConfigs.isAutoRerollEnabled() && !targets.isEmpty() && panel.currentSelection() != null;
 	}
 
 	// --------------------------------------------------------------- model queries

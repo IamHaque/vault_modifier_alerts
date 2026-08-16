@@ -24,6 +24,15 @@ public class StartStopButtonElement extends ButtonElement<StartStopButtonElement
 		super(Spatials.size(width, height), RerollTokens.START_BUTTON_TEXTURES, onClick);
 		this.state = state;
 		setDisabled(() -> !state.canStart() && !AutoRerollEngine.getInstance().isRunning());
+		tooltip(() -> {
+			if (AutoRerollEngine.getInstance().isRunning()) {
+				return new net.minecraft.network.chat.TextComponent("Stop the auto-reroll run");
+			}
+			if (state.canStart()) {
+				return new net.minecraft.network.chat.TextComponent("Start auto-rerolling the focused operation");
+			}
+			return new net.minecraft.network.chat.TextComponent("Select at least one target modifier to enable Start");
+		});
 	}
 
 	public void setFont(Font font) {
