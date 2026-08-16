@@ -148,8 +148,12 @@ compile (`./gradlew compileJava`).
   `RerollPanelLayout`'s unused `dropdownScroll` ctor param removed.
 - **3.4 Tooltip unification**: delete the manual popover
   (`hoverTooltip`/`drawTooltip`/`pendingTooltip`, `TOOLTIP_BG`) once no
-  hand-drawn rows remain. Partially done — the three converted rows no longer
-  use `pendingTooltip`; Min/Range/Potential rows still do (until 3.1/3.3).
+  hand-drawn rows remain. **Done**: the only remaining popover user was the
+  hand-drawn Range row — now a `RangeRowElement` (same live text + truncation,
+  declarative `onHoverTooltip`); the whole popover machinery and
+  `TOOLTIP_BG` are deleted. The stale status-text debounce in
+  `computeStatusInfo` (`STATUS_DEBOUNCE_TICKS` commit `7f2a5dd3`) is removed
+  too — see QA round 2 item 3.
 
 ## 4. P4 — glyph cleanup, process, docs
 
@@ -219,15 +223,17 @@ and `VMA_Reroll_Panel_Rewrite_Plan.md`.
    position. The stepper and Start/Stop layout lambdas now set explicit sizes
    (12x12 and full-width x `BUTTON_H`); the toggle icons are blitted at 12x12
    (IPosition/ISize overload) instead of native 16px in a 14px row.
-3. **Status text stayed on "Rolling #0 - 0/2 met" during a run** — the display
-   path is verified live per frame (StatusRowElement → computeStatusInfo; the
-   old debounce from `c1e97d36`/`7f2a5dd3` is gone), so a frozen "#0" means the
-   engine ran with `rolls() == 0` — i.e. only auto-reset presses happened
-   (they don't count as rolls). `runningStatus` now appends
-   `(reset x N)` when the engine auto-reset potential, making that state
-   visible. **Shelf / next QA**: confirm the reset-loop hypothesis with one
-   run under debug logging (per-roll logs record every press, reset and
-   result); if confirmed, the engine's out-of-potential path is the next fix.
+3. **Status text stayed on "Rolling #0 - 0/2 met" during a run** — **root
+   cause found and fixed**: `computeStatusInfo` still ran the leftover tick
+   debounce from `7f2a5dd3` (`STATUS_DEBOUNCE_TICKS`): the displayed status
+   only advanced after the text stayed identical for 4 consecutive game
+   ticks, and during a run the text changes every roll, so the counter kept
+   resetting and the display froze on the first committed line until the run
+   paused (e.g. at a potential reset). The debounce is removed —
+   `computeStatusInfo` returns the live status. `runningStatus` additionally
+   appends `(reset x N)` when the engine auto-reset potential this session
+   (the earlier "reset-loop" hypothesis is no longer required to explain the
+   freeze).
 
 ### Open in-game QA (after the fixes above)
 

@@ -40,7 +40,4 @@ public final class RerollTokens {
 	// Dropdown
 	public static final int DROPDOWN_BG = 0xF0181818;
 	public static final int DROPDOWN_REMOVE_HOVER = 0xFF4A1F1F;
-
-	// Tooltip
-	public static final int TOOLTIP_BG = 0xF0101010;
 }

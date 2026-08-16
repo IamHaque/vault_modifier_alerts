@@ -54,20 +54,6 @@ public final class RerollPanel {
 	private ItemStack cachedCandidatesGear = ItemStack.EMPTY;
 	private ResourceLocation cachedCandidatesOperation;
 	private List<Candidate> cachedCandidates = List.of();
-	private String pendingTooltip;
-	private int tooltipX;
-	private int tooltipY;
-
-	// Status debounce (Phase 5.3): cache status and only update after
-	// STATUS_DEBOUNCE_TICKS consecutive game ticks with the same text. The
-	// counter advances once per game tick (tracked via the level's game time),
-	// not per render call, so framerate and the mixin's second render pass
-	// cannot shorten the debounce window.
-	private static final int STATUS_DEBOUNCE_TICKS = 4;
-	private StatusInfo cachedStatus;
-	private int statusStableTicks;
-	private long lastStatusGameTime = -1;
-	private StatusInfo displayedStatus;
 
 	private RerollPanel() {
 		state.setPanel(this);
@@ -331,22 +317,17 @@ public final class RerollPanel {
 		GearModificationAction operation = operations.isEmpty() ? null : operations.get(state.operationIndex());
 		List<Candidate> candidates = operation == null ? List.of() : candidates(gear, operation);
 		RerollPanelLayout layout = computeLayout(x, y);
-		pendingTooltip = null;
 
 		drawPanelFrame(poseStack, layout);
 		drawCentered(poseStack, "Auto-Reroll", x + width / 2, y + 4, RerollTokens.ACCENT_GOLD());
 
 		if (operation == null) {
 			drawString(poseStack, "No re-roll actions", x + RerollPanelLayout.PAD_X, layout.focusY + 3, RerollTokens.STATE_DANGER());
-			drawTooltip(poseStack);
 			return;
 		}
 
 		drawMinRow(poseStack, layout, x, width, mouseX, mouseY);
-		drawRangeRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawPotentialRow(poseStack, layout, x, width, operation);
-
-		drawTooltip(poseStack);
 	}
 
 	public boolean handleClick(VaultArtisanStationScreen screen, int x, int y, int width, int height, int mouseX,
@@ -438,20 +419,6 @@ public final class RerollPanel {
 				: RerollTokens.TEXT_DISABLED);
 	}
 
-	private void drawRangeRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX, int mouseY) {
-		RollRange range = currentTargetRange();
-		String text = range.numeric() ? "Range: " + range.displayText() : "Range: ?";
-		String full = text;
-		int maxChars = (layout.width - RerollPanelLayout.PAD_X * 2) / 7;
-		if (text.length() > maxChars) {
-			text = truncate(text, maxChars);
-			if (rowHovered(layout, mouseX, mouseY, layout.rangeY, RerollPanelLayout.ROW_H)) {
-				hoverTooltip(full, mouseX, mouseY);
-			}
-		}
-		drawString(poseStack, text, x + RerollPanelLayout.PAD_X, layout.rangeY + 3, RerollTokens.TEXT_MUTED);
-	}
-
 	private void drawPotentialRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width,
 			GearModificationAction operation) {
 		ItemStack gear = stationGear();
@@ -525,48 +492,6 @@ public final class RerollPanel {
 
 
 
-	// --------------------------------------------------------- tooltip
-
-	public void hoverTooltip(String fullText, int mouseX, int mouseY) {
-		if (fullText == null || fullText.isEmpty()) {
-			return;
-		}
-		pendingTooltip = fullText;
-		tooltipX = mouseX;
-		tooltipY = mouseY;
-	}
-
-	private void drawTooltip(PoseStack poseStack) {
-		if (pendingTooltip == null) {
-			return;
-		}
-		net.minecraft.client.gui.Font font = font();
-		List<String> lines = wrapText(pendingTooltip, 190);
-		int boxWidth = 0;
-		for (String line : lines) {
-			boxWidth = Math.max(boxWidth, font.width(line));
-		}
-		boxWidth += 8;
-		int boxHeight = lines.size() * font.lineHeight + 8;
-		int screenWidth = Minecraft.getInstance().screen.width;
-		int screenHeight = Minecraft.getInstance().screen.height;
-		int boxX = Math.min(tooltipX + 8, Math.max(2, screenWidth - boxWidth - 4));
-		int boxY = tooltipY + 10;
-		if (boxY + boxHeight > screenHeight - 4) {
-			boxY = Math.max(2, tooltipY - boxHeight - 6);
-		}
-		GuiComponent.fill(poseStack, boxX, boxY, boxX + boxWidth, boxY + boxHeight, RerollTokens.TOOLTIP_BG);
-		GuiComponent.fill(poseStack, boxX, boxY, boxX + boxWidth, boxY + 1, RerollTokens.PANEL_BORDER());
-		GuiComponent.fill(poseStack, boxX, boxY + boxHeight - 1, boxX + boxWidth, boxY + boxHeight, RerollTokens.PANEL_BORDER());
-		GuiComponent.fill(poseStack, boxX, boxY, boxX + 1, boxY + boxHeight, RerollTokens.PANEL_BORDER());
-		GuiComponent.fill(poseStack, boxX + boxWidth - 1, boxY, boxX + boxWidth, boxY + boxHeight, RerollTokens.PANEL_BORDER());
-		int lineY = boxY + 4;
-		for (String line : lines) {
-			drawString(poseStack, line, boxX + 3, lineY, RerollTokens.TEXT_DEFAULT());
-			lineY += font.lineHeight;
-		}
-	}
-
 	// --------------------------------------------------------- static utilities
 
 	public static String stopReasonText(StopReason reason) {
@@ -597,41 +522,6 @@ public final class RerollPanel {
 			number = number.replaceAll("0$", "").replaceAll("\\.$", "");
 		}
 		return number + (percent ? "%" : "");
-	}
-
-	private static List<String> wrapText(String text, int maxWidth) {
-		List<String> lines = new ArrayList<>();
-		if (text == null || text.isEmpty()) {
-			return lines;
-		}
-		StringBuilder line = new StringBuilder();
-		for (String word : text.split(" ")) {
-			if (!line.isEmpty() && font().width(line + " " + word) > maxWidth) {
-				lines.add(line.toString());
-				line.setLength(0);
-			}
-			if (line.isEmpty() && font().width(word) > maxWidth) {
-				String rest = word;
-				while (font().width(rest) > maxWidth) {
-					int cut = Math.max(1, rest.length() - 1);
-					while (cut > 1 && font().width(rest.substring(0, cut)) > maxWidth) {
-						cut--;
-					}
-					lines.add(rest.substring(0, cut));
-					rest = rest.substring(cut);
-				}
-				line.append(rest);
-			} else {
-				if (!line.isEmpty()) {
-					line.append(' ');
-				}
-				line.append(word);
-			}
-		}
-		if (!line.isEmpty()) {
-			lines.add(line.toString());
-		}
-		return lines;
 	}
 
 	// --------------------------------------------------------- drawing primitives
@@ -731,20 +621,6 @@ public final class RerollPanel {
 			color = RerollTokens.STATE_SUCCESS();
 			full = targetDetail(engine);
 		}
-		StatusInfo fresh = new StatusInfo(text, color, full);
-		long gameTime = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getGameTime() : 0;
-		if (gameTime != lastStatusGameTime) {
-			lastStatusGameTime = gameTime;
-			if (cachedStatus == null || !cachedStatus.text().equals(fresh.text()) || cachedStatus.color() != fresh.color()) {
-				cachedStatus = fresh;
-				statusStableTicks = 0;
-			} else {
-				statusStableTicks++;
-			}
-		}
-		if (displayedStatus == null || statusStableTicks >= STATUS_DEBOUNCE_TICKS) {
-			displayedStatus = fresh;
-		}
-		return displayedStatus;
+		return new StatusInfo(text, color, full);
 	}
 }

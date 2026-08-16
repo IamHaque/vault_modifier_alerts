@@ -6,6 +6,7 @@ import io.haque.vault_modifier_alerts.feature.reroll.ui.CounterRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.DropdownListElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.DropdownRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StepperButtonElement;
+import io.haque.vault_modifier_alerts.feature.reroll.ui.RangeRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StartStopButtonElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StatusRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.ToggleRowElement;
@@ -103,6 +104,12 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 		incButton.setDisabled(() -> !VmaClientConfigs.isAutoRerollEnabled()
 				|| !panel.currentTargetRange().numeric());
 		instance.addElement(incButton);
+
+		// Range row (row 5)
+		RangeRowElement rangeRow = new RangeRowElement(0, 0, RerollPanelLayout.WIDTH);
+		rangeRow.setFont(net.minecraft.client.Minecraft.getInstance().font);
+		anchorRow(rangeRow, RerollPanelLayout.TITLE_H + 4 * RerollPanelLayout.ROW_H);
+		instance.addElement(rangeRow);
 
 		// Dropdown rows (rows 1-3: Focus, Modifier, Targets)
 		DropdownRowElement focusRow = new DropdownRowElement(
