@@ -34,7 +34,9 @@ public final class ClientTickEvents {
 	 * every key press a screen receives, so the toggle is matched here instead.
 	 * An open panel dropdown or focused min-value field gets the key first
 	 * (Escape closes the dropdown, arrows scroll it, editing keys commit the
-	 * field).
+	 * field), and while the field is focused no key - including the panel
+	 * toggle - may be consumed by the panel toggle path (typing P into the
+	 * min-value field must not hide the panel).
 	 */
 	@SubscribeEvent
 	public static void onScreenKeyPressed(ScreenEvent.KeyboardKeyPressedEvent.Pre event) {
@@ -44,6 +46,9 @@ public final class ClientTickEvents {
 		RerollPanel panel = RerollPanel.getInstance();
 		if (panel.onKeyPressed(event.getKeyCode())) {
 			event.setCanceled(true);
+			return;
+		}
+		if (panel.isMinInputFocused()) {
 			return;
 		}
 		if (!KeyBindings.TOGGLE_REROLL_PANEL.matches(event.getKeyCode(), event.getScanCode())) {

@@ -11,7 +11,7 @@ then P1 correctness, then the remaining Phase 3 conversions and polish.
 | 0.1   | Anchor `anchorRow` helper + fix 5 child row positions | Done (commit `938bc567` +) |
 | 0.2   | Z-order: re-render full element before the tooltip pass | Done |
 | 0.3   | Host API verification (done at bytecode level) + compile gate | Done (compile passes) |
-| 1     | compactMode removal; debounce ticks; P-key guard; config comments | Pending |
+| 1     | compactMode removal; debounce ticks; P-key guard; config comments | Done |
 | 2     | Non-numeric Min guard; canStart ops; Start tooltip; candidates memo; doc drift | Pending |
 | 3     | Row conversions (Min stepper → real elements; DropdownRowElement; dropdown internals; tooltip unification) | Pending |
 | 4     | Glyph cleanup; per-row QA checklist; DEC-032 docs | Pending |

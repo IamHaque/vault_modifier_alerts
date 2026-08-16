@@ -56,10 +56,14 @@ public final class RerollPanel {
 	private int tooltipY;
 
 	// Status debounce (Phase 5.3): cache status and only update after
-	// STATUS_DEBOUNCE_TICKS consecutive frames with the same text
+	// STATUS_DEBOUNCE_TICKS consecutive game ticks with the same text. The
+	// counter advances once per game tick (tracked via the level's game time),
+	// not per render call, so framerate and the mixin's second render pass
+	// cannot shorten the debounce window.
 	private static final int STATUS_DEBOUNCE_TICKS = 4;
 	private StatusInfo cachedStatus;
 	private int statusStableTicks;
+	private long lastStatusGameTime = -1;
 	private StatusInfo displayedStatus;
 
 	private RerollPanel() {
@@ -886,11 +890,15 @@ public final class RerollPanel {
 			full = targetDetail(engine);
 		}
 		StatusInfo fresh = new StatusInfo(text, color, full);
-		if (cachedStatus == null || !cachedStatus.text().equals(fresh.text()) || cachedStatus.color() != fresh.color()) {
-			cachedStatus = fresh;
-			statusStableTicks = 0;
-		} else {
-			statusStableTicks++;
+		long gameTime = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getGameTime() : 0;
+		if (gameTime != lastStatusGameTime) {
+			lastStatusGameTime = gameTime;
+			if (cachedStatus == null || !cachedStatus.text().equals(fresh.text()) || cachedStatus.color() != fresh.color()) {
+				cachedStatus = fresh;
+				statusStableTicks = 0;
+			} else {
+				statusStableTicks++;
+			}
 		}
 		if (displayedStatus == null || statusStableTicks >= STATUS_DEBOUNCE_TICKS) {
 			displayedStatus = fresh;

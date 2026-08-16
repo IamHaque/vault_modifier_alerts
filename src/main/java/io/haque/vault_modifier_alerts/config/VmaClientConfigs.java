@@ -49,7 +49,6 @@ public final class VmaClientConfigs {
 
 	public static final ForgeConfigSpec.BooleanValue REROLL_PANEL_ENABLED;
 	public static final ForgeConfigSpec.ConfigValue<String> REROLL_PANEL_SIDE;
-	public static final ForgeConfigSpec.BooleanValue REROLL_PANEL_COMPACT_MODE;
 	public static final ForgeConfigSpec.ConfigValue<Integer> PANEL_BG_COLOR;
 	public static final ForgeConfigSpec.ConfigValue<Integer> PANEL_BORDER_COLOR;
 	public static final ForgeConfigSpec.ConfigValue<Integer> PANEL_TEXT_COLOR;
@@ -91,18 +90,38 @@ public final class VmaClientConfigs {
 		builder.pop();
 
 		builder.push("Auto Reroll");
-		AUTO_REROLL_ENABLED = builder.define("enabled", false);
-		AUTO_REROLL_TICK_INTERVAL = builder.defineInRange("tickInterval", 4, 2, 200);
-		AUTO_REROLL_ROLL_GAP_TICKS = builder.defineInRange("rollGapTicks", 2, 1, 40);
-		AUTO_REROLL_ROLL_TIMEOUT_TICKS = builder.defineInRange("rollTimeoutTicks", 60, 10, 400);
-		AUTO_REROLL_MAX_ROLLS = builder.defineInRange("maxRolls", 0, 0, Integer.MAX_VALUE);
-		AUTO_REROLL_RESET_POTENTIAL = builder.define("autoResetPotential", true);
-		REROLL_SUCCESS_SOUND_EVENT = builder.define("successSoundEvent",
-				VmaReference.DEFAULT_REROLL_SOUND_EVENT, VmaClientConfigs::isValidSoundEventId);
-		REROLL_STOP_SOUND_EVENT = builder.define("stopSoundEvent",
-				VmaReference.DEFAULT_REROLL_SOUND_EVENT, VmaClientConfigs::isValidSoundEventId);
-		REROLL_VOLUME = builder.defineInRange("volume", 1.0D, 0.0D, 2.0D);
-		REROLL_PITCH = builder.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
+		AUTO_REROLL_ENABLED = builder
+				.comment("Enable auto-reroll while the artisan station is open.")
+				.define("enabled", false);
+		AUTO_REROLL_TICK_INTERVAL = builder
+				.comment("Engine evaluate interval in game ticks between rolls.")
+				.defineInRange("tickInterval", 4, 2, 200);
+		AUTO_REROLL_ROLL_GAP_TICKS = builder
+				.comment("Minimum ticks between two reroll button presses.")
+				.defineInRange("rollGapTicks", 2, 1, 40);
+		AUTO_REROLL_ROLL_TIMEOUT_TICKS = builder
+				.comment("Ticks to wait for a reroll result before giving up on the current press.")
+				.defineInRange("rollTimeoutTicks", 60, 10, 400);
+		AUTO_REROLL_MAX_ROLLS = builder
+				.comment("Maximum rolls per run; 0 means unlimited.")
+				.defineInRange("maxRolls", 0, 0, Integer.MAX_VALUE);
+		AUTO_REROLL_RESET_POTENTIAL = builder
+				.comment("Auto-apply a potential reset when the station offers one.")
+				.define("autoResetPotential", true);
+		REROLL_SUCCESS_SOUND_EVENT = builder
+				.comment("Sound event played when a run stops with all targets met.")
+				.define("successSoundEvent",
+						VmaReference.DEFAULT_REROLL_SOUND_EVENT, VmaClientConfigs::isValidSoundEventId);
+		REROLL_STOP_SOUND_EVENT = builder
+				.comment("Sound event played when a run stops without reaching the goal.")
+				.define("stopSoundEvent",
+						VmaReference.DEFAULT_REROLL_SOUND_EVENT, VmaClientConfigs::isValidSoundEventId);
+		REROLL_VOLUME = builder
+				.comment("Volume for reroll status sounds.")
+				.defineInRange("volume", 1.0D, 0.0D, 2.0D);
+		REROLL_PITCH = builder
+				.comment("Pitch for reroll status sounds.")
+				.defineInRange("pitch", 1.0D, 0.5D, 2.0D);
 		builder.pop();
 
 		builder.push("Reroll Panel");
@@ -112,9 +131,6 @@ public final class VmaClientConfigs {
 		REROLL_PANEL_SIDE = builder
 				.comment("Panel side preference: AUTO (left-first, fallback right), LEFT, or RIGHT.")
 				.define("side", "AUTO", v -> v instanceof String s && (s.equals("AUTO") || s.equals("LEFT") || s.equals("RIGHT")));
-		REROLL_PANEL_COMPACT_MODE = builder
-				.comment("Collapse optional rows (range, counter) for a denser HUD.")
-				.define("compactMode", false);
 		PANEL_BG_COLOR = builder
 				.comment("Panel background color (ARGB hex).")
 				.define("panelBgColor", 0xEE111111);
@@ -219,10 +235,6 @@ public final class VmaClientConfigs {
 
 	public static String rerollPanelSide() {
 		return REROLL_PANEL_SIDE.get();
-	}
-
-	public static boolean isRerollPanelCompactMode() {
-		return REROLL_PANEL_COMPACT_MODE.get();
 	}
 
 	public static int panelBgColor() {
