@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.CounterRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.DropdownListElement;
+import io.haque.vault_modifier_alerts.feature.reroll.ui.DropdownRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StartStopButtonElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.StatusRowElement;
 import io.haque.vault_modifier_alerts.feature.reroll.ui.ToggleRowElement;
@@ -71,6 +72,25 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 				instance.setWidth(width);
 			}
 		});
+
+		// Dropdown rows (rows 1-3: Focus, Modifier, Targets)
+		DropdownRowElement focusRow = new DropdownRowElement(
+				0, RerollPanelLayout.TITLE_H, RerollPanelLayout.WIDTH, screen,
+				RerollPanelState.DropdownMode.OPERATION);
+		anchorRow(focusRow, RerollPanelLayout.TITLE_H);
+		instance.addElement(focusRow);
+
+		DropdownRowElement modifierRow = new DropdownRowElement(
+				0, RerollPanelLayout.TITLE_H + RerollPanelLayout.ROW_H, RerollPanelLayout.WIDTH, screen,
+				RerollPanelState.DropdownMode.MODIFIER);
+		anchorRow(modifierRow, RerollPanelLayout.TITLE_H + RerollPanelLayout.ROW_H);
+		instance.addElement(modifierRow);
+
+		DropdownRowElement targetsRow = new DropdownRowElement(
+				0, RerollPanelLayout.TITLE_H + 2 * RerollPanelLayout.ROW_H, RerollPanelLayout.WIDTH, screen,
+				RerollPanelState.DropdownMode.TARGETS);
+		anchorRow(targetsRow, RerollPanelLayout.TITLE_H + 2 * RerollPanelLayout.ROW_H);
+		instance.addElement(targetsRow);
 
 		// Auto-reroll toggle (row 8, 0-indexed: title + 6 rows above)
 		int rerollToggleY = RerollPanelLayout.TITLE_H + 6 * RerollPanelLayout.ROW_H;

@@ -421,7 +421,7 @@ public final class RerollPanelState {
 	}
 
 	/** Package-private setter for the stop-condition chip toggle. */
-	void setStopCondition(AutoRerollEngine.StopCondition condition) {
+	public void setStopCondition(AutoRerollEngine.StopCondition condition) {
 		this.stopCondition = condition;
 	}
 
@@ -432,7 +432,7 @@ public final class RerollPanelState {
 	}
 
 	/** Package-private reset for the min-input text (used by clear-targets). */
-	void resetMinInputText() {
+	public void resetMinInputText() {
 		this.minInputText = "";
 	}
 

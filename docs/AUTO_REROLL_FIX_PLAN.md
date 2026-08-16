@@ -13,8 +13,8 @@ then P1 correctness, then the remaining Phase 3 conversions and polish.
 | 0.3   | Host API verification (done at bytecode level) + compile gate | Done (compile passes) |
 | 1     | compactMode removal; debounce ticks; P-key guard; config comments | Done |
 | 2     | Non-numeric Min guard; canStart ops; Start tooltip; candidates memo; doc drift | Done (doc drift: value kept, question recorded in DEC-032) |
-| 3     | Row conversions (Min stepper → real elements; DropdownRowElement; dropdown internals; tooltip unification) | Pending |
-| 4     | Glyph cleanup; per-row QA checklist; DEC-032 docs | Pending |
+| 3     | Row conversions (Min stepper → real elements; DropdownRowElement; dropdown internals; tooltip unification) | Partial: 3.2 done; 3.1 steppers + 3.3 remain |
+| 4     | Glyph cleanup; per-row QA checklist; DEC-032 docs | Partial (⌄ chevron shipped with 3.2) |
 
 ## Baseline findings (bytecode-verified against `libs/the_vault-...jar`)
 
@@ -112,14 +112,28 @@ compile (`./gradlew compileJava`).
 - **3.1 Min stepper**: two small `ButtonElement`s (`BUTTON_EMPTY_16_TEXTURES`)
   + numeric-filtered `TextInputElement<T>` subclass; host cursor replaces the
   manual blink timer. Preserve right-click clear, Enter/Esc commit, `.` once.
+  **Done in part**: state-level numeric guards shipped in P2. The stepper
+  buttons themselves can become `ButtonElement`s, but the field **cannot** use
+  `TextInputElement`: the framework does not route keyboard/char events to
+  owned elements (input is screen-event-driven via `ClientTickEvents` +
+  `RerollPanelState` by design). Keep the state-machine field; only the visual
+  `-`/`+` chrome is element-eligible.
 - **3.2 Focus/Modifier/Targets rows**: one parameterized `DropdownRowElement`;
   Targets chip (`any`/`all`) + clear `x` as right-edge child buttons; triangle →
-  `⌄` chevron.
+  `⌄` chevron. **Done** (`ui/DropdownRowElement.java`): rows are real container
+  children anchored via `anchorRow` at `TITLE_H + n*ROW_H`; chip/clear remain
+  zones inside the row's `onMouseClicked`/`onHoverTooltip` (identical geometry
+  to `RerollPanelLayout.regionAt`); legacy `drawRow`/`drawModifierRow`/
+  `drawTargetsRow` and their `handleClick` cases + dead `HitType`s removed;
+  truncated-value and clear-zone tooltips are now declarative. **QA still
+  required in-game** (side flips, resize, click-outside, tooltip overlap).
 - **3.3 `DropdownListElement` internals**: migrate to
   `VerticalScrollClipContainer` + per-row elements (host scrollbar math).
+  **Deferred**: largest single piece; requires in-game QA before proceeding.
 - **3.4 Tooltip unification**: delete the manual popover
   (`hoverTooltip`/`drawTooltip`/`pendingTooltip`, `TOOLTIP_BG`) once no
-  hand-drawn rows remain.
+  hand-drawn rows remain. Partially done — the three converted rows no longer
+  use `pendingTooltip`; Min/Range/Potential rows still do (until 3.1/3.3).
 
 ## 4. P4 — glyph cleanup, process, docs
 

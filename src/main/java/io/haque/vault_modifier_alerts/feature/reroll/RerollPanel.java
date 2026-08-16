@@ -351,10 +351,6 @@ public final class RerollPanel {
 			return;
 		}
 
-		drawRow(poseStack, layout, "Focus", displayOperationName(operation), layout.focusY, mouseX, mouseY,
-				state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION);
-		drawModifierRow(poseStack, layout, mouseX, mouseY);
-		drawTargetsRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawMinRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawRangeRow(poseStack, layout, x, width, mouseX, mouseY);
 		drawPotentialRow(poseStack, layout, x, width, operation);
@@ -394,36 +390,6 @@ public final class RerollPanel {
 		Hit hit = layout.regionAt(mouseX, mouseY);
 
 		switch (hit.type()) {
-			case FOCUS_ROW -> {
-				state.loseMinFocus();
-				state.toggleDropdown(RerollPanelState.DropdownMode.OPERATION, operationCount);
-			}
-			case MODIFIER_ROW -> {
-				state.loseMinFocus();
-				state.toggleDropdown(RerollPanelState.DropdownMode.MODIFIER, candidateCount);
-			}
-			case TARGETS_ROW -> {
-				state.loseMinFocus();
-				state.toggleDropdown(RerollPanelState.DropdownMode.TARGETS, state.targets().size());
-			}
-			case TARGETS_CHIP -> {
-				state.loseMinFocus();
-				state.closeDropdown();
-				toggleStopCondition();
-			}
-			case TARGETS_CLEAR -> {
-				state.loseMinFocus();
-				state.closeDropdown();
-				if (AutoRerollEngine.getInstance().isRunning()) {
-					AutoRerollEngine.getInstance().stop(StopReason.STOPPED, false);
-				}
-				AutoRerollEngine.getInstance().cancelResume();
-				state.targets().clear();
-				state.focusTarget(-1);
-				// Reset minInputText directly — state exposes this via resetMinInput or we do
-				// it here
-				resetMinInput();
-			}
 			case MIN_DEC -> state.stepMin(-state.currentStep());
 			case MIN_INC -> state.stepMin(state.currentStep());
 			case MIN_FIELD -> state.toggleMinFocus();
@@ -453,93 +419,6 @@ public final class RerollPanel {
 				layout.x + layout.width, layout.y + layout.totalHeight, RerollTokens.PANEL_BORDER());
 	}
 
-	private void drawRow(PoseStack poseStack, RerollPanelLayout layout, String label, String value, int y, int mouseX,
-			int mouseY, boolean open) {
-		boolean hovered = rowHovered(layout, mouseX, mouseY, y, RerollPanelLayout.ROW_H);
-		if (open) {
-			GuiComponent.fill(poseStack, layout.x, y, layout.x + layout.width,
-					y + RerollPanelLayout.ROW_H, RerollTokens.ROW_OPEN);
-		} else if (hovered) {
-			GuiComponent.fill(poseStack, layout.x, y, layout.x + layout.width,
-					y + RerollPanelLayout.ROW_H, RerollTokens.ROW_HOVER);
-		}
-		int color = VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED;
-		drawString(poseStack, label, layout.x + RerollPanelLayout.PAD_X, y + 3, RerollTokens.TEXT_MUTED);
-		drawString(poseStack, value, layout.x + 62, y + 3, color);
-		drawTriangle(poseStack, layout.x + layout.width - 8, y + 6, false, color);
-		if (hovered && layout.x + 62 + font().width(value) > layout.x + layout.width
-				- RerollPanelLayout.PAD_X) {
-			hoverTooltip(value, mouseX, mouseY);
-		}
-	}
-
-	private void drawModifierRow(PoseStack poseStack, RerollPanelLayout layout, int mouseX, int mouseY) {
-		boolean hovered = rowHovered(layout, mouseX, mouseY, layout.modifierY, RerollPanelLayout.ROW_H);
-		if (state.dropdownMode() == RerollPanelState.DropdownMode.MODIFIER) {
-			GuiComponent.fill(poseStack, layout.x, layout.modifierY, layout.x + layout.width,
-					layout.modifierY + RerollPanelLayout.ROW_H, RerollTokens.ROW_OPEN);
-		} else if (hovered) {
-			GuiComponent.fill(poseStack, layout.x, layout.modifierY, layout.x + layout.width,
-					layout.modifierY + RerollPanelLayout.ROW_H, RerollTokens.ROW_HOVER);
-		}
-		int color = VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED;
-		drawString(poseStack, "Modifier", layout.x + RerollPanelLayout.PAD_X, layout.modifierY + 3, RerollTokens.TEXT_MUTED);
-		String placeholder = state.targets().isEmpty() ? "add a modifier..." : "+ add modifier";
-		drawString(poseStack, placeholder, layout.x + 62, layout.modifierY + 3, color);
-		drawTriangle(poseStack, layout.x + layout.width - 8, layout.modifierY + 6, false, color);
-	}
-
-	private void drawTargetsRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX,
-			int mouseY) {
-		boolean hovered = rowHovered(layout, mouseX, mouseY, layout.targetsY, RerollPanelLayout.ROW_H);
-		boolean chipHovered = hovered && mouseX >= x + width - 24;
-		boolean clearHovered = hovered && mouseX >= x + width - 44 && mouseX < x + width - 26;
-		boolean addHovered = hovered && !chipHovered && !clearHovered;
-		if (state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS) {
-			GuiComponent.fill(poseStack, layout.x, layout.targetsY, layout.x + layout.width,
-					layout.targetsY + RerollPanelLayout.ROW_H, RerollTokens.ROW_OPEN);
-		} else if (addHovered) {
-			GuiComponent.fill(poseStack, layout.x, layout.targetsY, layout.x + layout.width,
-					layout.targetsY + RerollPanelLayout.ROW_H, RerollTokens.ROW_HOVER);
-		}
-		drawString(poseStack, "Targets", layout.x + RerollPanelLayout.PAD_X, layout.targetsY + 3, RerollTokens.TEXT_MUTED);
-		String value;
-		RollTarget focused = state.focusedTarget() >= 0 && state.focusedTarget() < state.targets().size()
-				? state.targets().get(state.focusedTarget())
-				: null;
-		if (focused == null) {
-			value = state.targets().isEmpty() ? "none" : "?";
-		} else {
-			value = targetName(focused.id());
-			if (focused.thresholdEnabled()) {
-				value += " >=" + formatDisplay(focused.thresholdValue(), currentTargetRange().percent());
-			}
-		}
-		String full = value;
-		int maxChars = (layout.width - 62 - 50 - RerollPanelLayout.PAD_X) / 7;
-		boolean truncated = value.length() > maxChars;
-		if (truncated) {
-			value = truncate(value, maxChars);
-		}
-		int color = VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED;
-		drawString(poseStack, value, layout.x + 62, layout.targetsY + 3, color);
-		if (hovered && !chipHovered && !clearHovered && truncated) {
-			hoverTooltip(full, mouseX, mouseY);
-		}
-		GuiComponent.fill(poseStack, x + width - 44, layout.targetsY, x + width - 26,
-				layout.targetsY + RerollPanelLayout.ROW_H, clearHovered ? RerollTokens.ROW_HOVER : RerollTokens.DROPDOWN_BG);
-		drawCentered(poseStack, "x", x + width - 35, layout.targetsY + 3,
-				clearHovered ? RerollTokens.STATE_DANGER() : (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED));
-		if (clearHovered) {
-			hoverTooltip("Clear all targets", mouseX, mouseY);
-		}
-		GuiComponent.fill(poseStack, x + width - 24, layout.targetsY, x + width,
-				layout.targetsY + RerollPanelLayout.ROW_H,
-				chipHovered ? RerollTokens.ROW_HOVER : RerollTokens.DROPDOWN_BG);
-		drawString(poseStack, state.stopCondition() == AutoRerollEngine.StopCondition.ANY ? "any" : "all",
-				x + width - 22, layout.targetsY + 3,
-				chipHovered ? RerollTokens.ACCENT_GOLD() : (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED));
-	}
 
 	private void drawMinRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width, int mouseX, int mouseY) {
 		RollRange range = currentTargetRange();
@@ -709,25 +588,6 @@ public final class RerollPanel {
 		}
 	}
 
-	// --------------------------------------------------------- small state helpers
-	// (used by handleClick)
-
-	private void toggleStopCondition() {
-		AutoRerollEngine.StopCondition sc = state.stopCondition();
-		setStopCondition(sc == AutoRerollEngine.StopCondition.ANY
-				? AutoRerollEngine.StopCondition.ALL
-				: AutoRerollEngine.StopCondition.ANY);
-	}
-
-	private void setStopCondition(AutoRerollEngine.StopCondition condition) {
-		state.setStopCondition(condition);
-	}
-
-	private void resetMinInput() {
-		// Package-private access to state's minInputText for the clear-targets branch
-		state.resetMinInputText();
-	}
-
 	// --------------------------------------------------------- static utilities
 
 	public static String stopReasonText(StopReason reason) {
@@ -815,13 +675,6 @@ public final class RerollPanel {
 
 	static void drawRight(PoseStack poseStack, String text, int rightX, int y, int color) {
 		font().draw(poseStack, text, rightX - font().width(text), y, color);
-	}
-
-	private static void drawTriangle(PoseStack poseStack, int centerX, int topY, boolean up, int color) {
-		for (int i = 0; i < 3; i++) {
-			int rowY = up ? topY + (2 - i) : topY + i;
-			GuiComponent.fill(poseStack, centerX - i, rowY, centerX + i + 1, rowY + 1, color);
-		}
 	}
 
 	public record StatusInfo(String text, int color, String full) {

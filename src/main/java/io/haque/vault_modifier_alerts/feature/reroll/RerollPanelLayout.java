@@ -26,7 +26,7 @@ public final class RerollPanelLayout {
 	public static final int MAX_DROPDOWN_ROWS = 8;
 
 	public 	enum HitType {
-		NONE, FOCUS_ROW, MODIFIER_ROW, TARGETS_ROW, TARGETS_CHIP, TARGETS_CLEAR, MIN_DEC, MIN_FIELD, MIN_INC
+		NONE, MIN_DEC, MIN_FIELD, MIN_INC
 	}
 
 	public record Hit(HitType type, int index) {
@@ -43,8 +43,6 @@ public final class RerollPanelLayout {
 
 	public final int titleBottom;
 	public final int focusY;
-	public final int modifierY;
-	public final int targetsY;
 	public final int minY;
 	public final int rangeY;
 	public final int potentialY;
@@ -64,9 +62,7 @@ public final class RerollPanelLayout {
 
 		titleBottom = y + TITLE_H;
 		focusY = titleBottom;
-		modifierY = focusY + ROW_H;
-		targetsY = modifierY + ROW_H;
-		minY = targetsY + ROW_H;
+		minY = focusY + 3 * ROW_H;
 		rangeY = minY + ROW_H;
 		potentialY = rangeY + ROW_H;
 		rerollToggleY = potentialY + ROW_H;
@@ -109,21 +105,6 @@ public final class RerollPanelLayout {
 		}
 		if (mouseY >= dropdownY) {
 			return Hit.MISS;
-		}
-		if (inside(mouseY, focusY, ROW_H)) {
-			return new Hit(HitType.FOCUS_ROW, -1);
-		}
-		if (inside(mouseY, modifierY, ROW_H)) {
-			return new Hit(HitType.MODIFIER_ROW, -1);
-		}
-		if (inside(mouseY, targetsY, ROW_H)) {
-			if (mouseX >= x + width - 24) {
-				return new Hit(HitType.TARGETS_CHIP, -1);
-			}
-			if (mouseX >= x + width - 44) {
-				return new Hit(HitType.TARGETS_CLEAR, -1);
-			}
-			return new Hit(HitType.TARGETS_ROW, -1);
 		}
 		if (inside(mouseY, minY, ROW_H)) {
 			if (mouseX < x + 16) {
