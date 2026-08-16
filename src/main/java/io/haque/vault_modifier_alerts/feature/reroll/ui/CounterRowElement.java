@@ -7,7 +7,7 @@ import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout;
 import iskallia.vault.client.gui.framework.element.ContainerElement;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
-import net.minecraft.client.Minecraft;
+import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import net.minecraft.client.gui.Font;
 
 /**

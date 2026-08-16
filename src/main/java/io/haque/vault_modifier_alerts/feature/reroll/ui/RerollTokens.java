@@ -46,13 +46,4 @@ public final class RerollTokens {
 
 	// Tooltip
 	public static final int TOOLTIP_BG = 0xF0101010;
-
-	// Spacing (Design Guidelines §11)
-	public static final int SPACING_TIGHT = 3;
-	public static final int SPACING_DEFAULT = 5;
-	public static final int SPACING_LOOSE = 7;
-
-	// Alpha convention (state intensity — Design Guidelines §11)
-	public static final int ALPHA_CONFIRMED = 0x64;
-	public static final int ALPHA_TRANSIENT = 0x40;
 }

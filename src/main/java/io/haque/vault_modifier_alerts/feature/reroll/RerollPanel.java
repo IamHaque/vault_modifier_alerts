@@ -322,7 +322,6 @@ public final class RerollPanel {
 		}
 		lastSeenGear = gear.copy();
 		clampSelections(operations, gear);
-		AutoRerollEngine engine = AutoRerollEngine.getInstance();
 		GearModificationAction operation = operations.isEmpty() ? null : operations.get(state.operationIndex());
 		List<Candidate> candidates = operation == null ? List.of() : candidates(gear, operation);
 		state.clampDropdownScroll(operations.size(), candidates.size());
@@ -707,11 +706,6 @@ public final class RerollPanel {
 	}
 
 	private void setStopCondition(AutoRerollEngine.StopCondition condition) {
-		// Accessed only from handleClick targets-chip branch; state exposes
-		// the field for reading; this writes it directly through the targets list.
-		// In Phase 3 this will be a proper state mutation method.
-		state.targets(); // no-op to satisfy reference; actual mutation below
-		// We use a package-private setter on state:
 		state.setStopCondition(condition);
 	}
 

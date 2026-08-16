@@ -4,7 +4,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout;
 import iskallia.vault.client.gui.framework.element.ContainerElement;
-import iskallia.vault.client.gui.framework.element.spi.ITooltipElement;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
 import iskallia.vault.client.gui.framework.render.spi.ITooltipRenderer;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
@@ -19,8 +18,7 @@ import net.minecraft.world.item.TooltipFlag;
  * computation to {@link RerollPanel#computeStatusInfo} and renders the
  * truncated label with declarative tooltip when the text overflows.
  */
-public class StatusRowElement extends ContainerElement<StatusRowElement>
-		implements ITooltipElement {
+public class StatusRowElement extends ContainerElement<StatusRowElement> {
 
 	private Font font;
 	private RerollPanel.StatusInfo lastInfo;

@@ -8,7 +8,6 @@ import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelState;
 import iskallia.vault.client.gui.framework.element.ContainerElement;
-import iskallia.vault.client.gui.framework.element.spi.ITooltipElement;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
 import iskallia.vault.client.gui.framework.render.spi.ITooltipRenderer;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
@@ -28,8 +27,7 @@ import java.util.List;
  * scroll triangles and a scrollable list of items. Replaces the hand-drawn
  * {@code drawDropdown()} in {@link RerollPanel}.
  */
-public class DropdownListElement extends ContainerElement<DropdownListElement>
-		implements ITooltipElement {
+public class DropdownListElement extends ContainerElement<DropdownListElement> {
 
 	private VaultArtisanStationScreen screen;
 
@@ -116,7 +114,6 @@ public class DropdownListElement extends ContainerElement<DropdownListElement>
 	}
 
 	private void renderItem(PoseStack poseStack, int index, int itemY, int mouseX, int mouseY) {
-		RerollPanel panel = RerollPanel.getInstance();
 		RerollPanelState state = RerollPanelState.getInstance();
 		boolean operationDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION;
 		boolean targetDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS;
@@ -151,7 +148,6 @@ public class DropdownListElement extends ContainerElement<DropdownListElement>
 
 		int rangeWidth = range.isEmpty() ? 0 : font.width(range);
 		int nameMax = x() + width() - RerollPanelLayout.PAD_X - rangeWidth - 8;
-		String fullName = name;
 		String shownName = RerollPanel.truncate(name, Math.max(8, (nameMax - x()) / 7));
 		font.draw(poseStack, shownName, x() + 11, itemY + 3, baseColor);
 
@@ -286,7 +282,7 @@ public class DropdownListElement extends ContainerElement<DropdownListElement>
 					: "any";
 		}
 		if (operationDropdown) {
-			int cost = panel.potentialCost(RerollPanel.stationGear(), panel.operations(screen).get(index));
+			int cost = RerollPanel.potentialCost(RerollPanel.stationGear(), panel.operations(screen).get(index));
 			return cost > 0 ? cost + " potential" : "";
 		}
 		List<GearModificationAction> operations = panel.operations(screen);
@@ -331,8 +327,6 @@ public class DropdownListElement extends ContainerElement<DropdownListElement>
 		}
 		String fullName = getItemName(index);
 		Font font = Minecraft.getInstance().font;
-		boolean operationDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION;
-		boolean targetDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS;
 		String range = getItemRange(index);
 		int rangeWidth = range.isEmpty() ? 0 : font.width(range);
 		int nameMax = x() + width() - RerollPanelLayout.PAD_X - rangeWidth - 8;

@@ -218,7 +218,6 @@ public final class ModifierCatalog {
 	 * ability/talent level-change tiers. JsonObject tier blocks are supported
 	 * as a fallback for custom attributes without a generator.
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static RollRange rollRange(ItemStack gear, ResourceLocation targetId, OperationScope scope) {
 		if (gear == null || gear.isEmpty() || targetId == null || scope == null) {
 			return new RollRange(0, 0, 0, false, false);

@@ -26,8 +26,7 @@ public final class RerollPanelLayout {
 	public static final int MAX_DROPDOWN_ROWS = 8;
 
 	public 	enum HitType {
-		NONE, FOCUS_ROW, MODIFIER_ROW, TARGETS_ROW, TARGETS_CHIP, TARGETS_CLEAR, MIN_DEC, MIN_FIELD, MIN_INC,
-		REROLL_TOGGLE, RESET_TOGGLE
+		NONE, FOCUS_ROW, MODIFIER_ROW, TARGETS_ROW, TARGETS_CHIP, TARGETS_CLEAR, MIN_DEC, MIN_FIELD, MIN_INC
 	}
 
 	public record Hit(HitType type, int index) {
@@ -99,14 +98,6 @@ public final class RerollPanelLayout {
 	public record Rect(int x, int y, int width, int height) {
 	}
 
-	/** The visible dropdown item rect at the given visible-slot index, or null when no dropdown is open. */
-	public Rect dropdownItem(int visibleIndex) {
-		if (dropdownVisibleItems == 0 || visibleIndex < 0 || visibleIndex >= dropdownVisibleItems) {
-			return null;
-		}
-		return new Rect(x, dropdownY + DROPDOWN_HEADER_H + visibleIndex * DROPDOWN_ITEM_H, width, DROPDOWN_ITEM_H);
-	}
-
 	/**
 	 * Maps a screen-space point to the region under it. The dropdown index is
 	 * resolved against the currently visible window, so callers must combine
@@ -145,12 +136,6 @@ public final class RerollPanelLayout {
 				return new Hit(HitType.MIN_FIELD, -1);
 			}
 			return new Hit(HitType.NONE, -1);
-		}
-		if (inside(mouseY, rerollToggleY, ROW_H)) {
-			return new Hit(HitType.REROLL_TOGGLE, -1);
-		}
-		if (inside(mouseY, resetToggleY, ROW_H)) {
-			return new Hit(HitType.RESET_TOGGLE, -1);
 		}
 		return Hit.MISS;
 	}
