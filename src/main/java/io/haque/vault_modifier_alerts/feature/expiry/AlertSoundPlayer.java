@@ -9,33 +9,31 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 public final class AlertSoundPlayer {
 
-	private static ResourceLocation missingSoundLogged;
-
 	private AlertSoundPlayer() {
 	}
 
 	public static void play(String soundEventId, double volume, double pitch, ResourceLocation modifierId) {
 		ResourceLocation soundId = ResourceLocation.tryParse(soundEventId);
 		if (soundId == null) {
-			logOnceMissing(soundEventId, null, modifierId);
+			VaultModifierAlerts.LOGGER.debug("[VMA] Sound event ID parse failed: input='{}' modifierId={}",
+					soundEventId, modifierId);
+			logMissingSound(soundEventId, null, modifierId);
 			return;
 		}
 		SoundEvent soundEvent = ForgeRegistries.SOUND_EVENTS.getValue(soundId);
 		if (soundEvent == null) {
-			logOnceMissing(soundEventId, soundId, modifierId);
+			VaultModifierAlerts.LOGGER.debug("[VMA] SoundEvent not registered: id='{}' modifierId={}",
+					soundId, modifierId);
+			logMissingSound(soundEventId, soundId, modifierId);
 			return;
 		}
+		VaultModifierAlerts.LOGGER.debug("[VMA] Playing sound: event={} vol={} pitch={}",
+				soundEvent, volume, pitch);
 		Minecraft.getInstance().getSoundManager()
 				.play(SimpleSoundInstance.forUI(soundEvent, (float) volume, (float) pitch));
 	}
 
-	private static void logOnceMissing(String configured, ResourceLocation parsed, ResourceLocation modifierId) {
-		if (missingSoundLogged != null) {
-			return;
-		}
-		missingSoundLogged = parsed == null
-			? ResourceLocation.tryParse("vault_modifier_alerts:invalid")
-			: parsed;
+	private static void logMissingSound(String configured, ResourceLocation parsed, ResourceLocation modifierId) {
 		VaultModifierAlerts.LOGGER.error("[VMA] Sound event {} not registered; alert for {} was silent",
 				configured, modifierId);
 	}

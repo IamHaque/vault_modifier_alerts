@@ -51,6 +51,11 @@ public final class DownedAlertEngine {
 			}
 		}
 		knownTeammates.retainAll(teammates.keySet());
+		if (VmaClientConfigs.isDebugLogging()) {
+			VaultModifierAlerts.LOGGER.debug(
+					"[VMA] Downed evaluate: inVault={} localDowned={} wasLocalDowned={} teammates={}",
+					inVaultNow, localDowned, wasLocalDowned, teammates.size());
+		}
 	}
 
 	private void resetSession(boolean nowInVault) {
