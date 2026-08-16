@@ -200,7 +200,7 @@ protection). Closing the screen stops the run.
 
 ### 4.4 Panel (`RerollPanel`)
 
-> **[see DEC-028 + DEC-029 + DEC-030 + DEC-031] — superseded by the GUI revamp.** Compact
+> **[see DEC-028 + DEC-029 + DEC-030 + DEC-031 + DEC-032] — superseded by the GUI revamp.** Compact
 > side panel (150×110) with `‹ ›` cycling selectors and raw row-math hit-testing was
 > replaced by a 216px-wide panel with click-to-open dropdown selectors, an Auto-reroll
 > on/off toggle, a multi-target watch list with per-target mins and an `any`/`all` stop
@@ -210,7 +210,11 @@ protection). Closing the screen stops the run.
 > ranges come from the attributes' typed tier configs via the generator API (DEC-029),
 > effect-avoidance targets show their chance band (DEC-030), ability/talent targets are
 > named by the ability they add, and over-long row text shows its full value in a hover
-> popover.
+> tooltip (declarative `.tooltip(...)`/`onHoverTooltip`; the popover machinery is gone —
+> see `RangeRowElement` and `DropdownItemRowElement`). DEC-032 pins the editing UX:
+> the Min field stays state-driven (`TextInputElement` rejected — the framework does not
+> route keystrokes to owned elements), stepper hit zones keep the 16px `regionAt` area
+> around 12px buttons, and `[x]`/`[ ]` remain text glyphs.
 
 Compact side panel (≈150×110 px, scale-safe), drawn with vanilla gui drawing calls
 (fill + `drawString`), containing:
@@ -227,7 +231,10 @@ Compact side panel (≈150×110 px, scale-safe), drawn with vanilla gui drawing 
 | Key | Type | Default | Range |
 | --- | --- | --- | --- |
 | `enabled` | boolean | `true` | – |
-| `tickInterval` | int | `15` | `[4, 200]` |
+| `tickInterval` | int | `4` | `[4, 200]` |
+
+> `tickInterval` default is `4` (owner-confirmed, DEC-032a); the "15" once shown in this
+> table could not be sourced from any in-repo doc.
 | `rollTimeoutTicks` | int | `60` | – |
 | `maxRolls` | int | `0` (unlimited) | ≥ 0 |
 | `autoResetPotential` | boolean | `true` | – |

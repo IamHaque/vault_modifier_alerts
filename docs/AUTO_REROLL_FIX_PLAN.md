@@ -159,18 +159,26 @@ compile (`./gradlew compileJava`).
 
 - `[x]`/`[ ]` → small atlas check/cross idiom; triangles → `⌄` chevron;
   `>`/`*` stay as text glyphs (no atlas equivalent).
+  **Superseded by DEC-032d** (2026-08-16): `[x]`/`[ ]` stay text glyphs too —
+  no verified host atlas check/cross icon to swap to.
 - Per-row QA checklist (in force from 0.1): LEFT + RIGHT panel side; GUI-scale
   resize; row renders inside panel bounds in order at correct width; click at
   rendered location works / click at screen top-left does nothing; slot
   tooltip overlap keeps panel on top.
-- `DECISIONS.md` DEC-032; supersede notes in `F3_AUTO_REROLL_PLAN.md` §4.4.
+- ~~`DECISIONS.md` DEC-032; supersede notes in `F3_AUTO_REROLL_PLAN.md` §4.4.~~
+  **Done (2026-08-16)**: DEC-032 recorded in `DECISIONS.md` (index + entry);
+  §4.4 supersede note added to `F3_AUTO_REROLL_PLAN.md` (incl. `RangeRowElement`
+  tooltip, state-driven Min field, tickInterval `4`).
 
-## 5. DEC-032 — decisions log (no `DECISIONS.md` exists in this repo)
+## 5. DEC-032 — decisions log
 
-Recorded here because `docs/DECISIONS.md` and `docs/F3_AUTO_REROLL_PLAN.md`
-(referenced by the earlier plans) do not exist in this repository; the only
-in-repo design docs are `DESIGN_GUIDELINES.md`, `QOLHunters_Design_Guidelines.md`
-and `VMA_Reroll_Panel_Rewrite_Plan.md`.
+Recorded here first (2026-08-16) because the earlier plans referenced a
+`docs/DECISIONS.md` that does not exist; the actual decision log is
+`DECISIONS.md` at the repo root. DEC-032 was moved into `DECISIONS.md` the same
+day — this section is retained as the working record.
+
+> **Superseded:** recorded in `DECISIONS.md` (DEC-032, index row + full entry).
+> This log stays as the in-context reference.
 
 - **DEC-032a `tickInterval` default**: stays `4` (owner-confirmed 2026-08-16).
   The "15" value from DEC-025/F3-plan could not be found in any in-repo doc;

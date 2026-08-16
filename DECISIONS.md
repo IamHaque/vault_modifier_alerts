@@ -98,6 +98,7 @@ Why this option over the alternatives.
 | DEC-029 | Typed tier-config parsing, ability names, threshold retention, spacing | RESOLVED | 2026-08-15 |
 | DEC-030 | Effect-avoidance chance ranges, name fixes, status wording, reset counter | RESOLVED | 2026-08-15 |
 | DEC-031 | Multi-target watch list: per-target mins, stop condition, picker UX | RESOLVED | 2026-08-15 |
+| DEC-032 | F3 panel input/editing decisions (a–e): tickInterval, Min field, steppers, markers, compactMode | RESOLVED | 2026-08-16 |
 
 ---
 
@@ -1614,3 +1615,61 @@ the owner asked for with an explicit default.
 - `/vma reroll start` uses the updated `RerollSelection(operationId, targets,
   stopCondition)`; engine public API changed (list-based start).
 - Base panel height grows by one row (~178 px), width stays 216.
+
+---
+
+### DEC-032 — F3 panel input/editing decisions (a–e)
+
+- **Date:** 2026-08-16
+- **Status:** RESOLVED
+- **Category:** Design / Scope
+
+**Context**
+
+Reviewed the F3 panel's remaining hand-rolled editing UX against the host framework's
+element API (bytecode-verified: `ButtonElement`, `TextInputElement`,
+`VerticalScrollClipContainer`, etc.) and against in-game QA findings. Five open
+sub-decisions needed pinning; recorded as DEC-032a–e (log in `docs/AUTO_REROLL_FIX_PLAN.md` §5).
+
+**Decision**
+
+1. **DEC-032a `tickInterval` default stays `4`** (owner-confirmed 2026-08-16). The "15"
+   value from DEC-025/F3-plan could not be found in any in-repo doc; no change without
+   evidence.
+2. **DEC-032b Min field stays state-driven.** `TextInputElement` was rejected — the
+   framework does not route keyboard/char events to owned elements (input path is
+   screen-event-driven by design). Blink cursor, right-click clear, Enter/Esc commit,
+   `.` once remain in `RerollPanelState`.
+3. **DEC-032c stepper hit zones:** 16px `regionAt` zones kept alongside 12px button
+   elements; outer 2px on each side still step via `handleClick`, preserving today's
+   effective hit area (bigger than the drawn button).
+4. **DEC-032d `[x]`/`[ ]` markers kept as text glyphs** in status strings and dropdown
+   items; no verified host atlas check/cross icon to swap to. Matches the existing
+   `>`/`*` text-glyph pattern.
+5. **DEC-032e `compactMode` removed** — dead config with no observable effect (both
+   review passes recommended removal).
+
+**Rationale**
+
+Each sub-decision either matches a host capability that is bytecode-verified and
+behaviourally proven in-game (stepper zones, text glyphs), or avoids a rewrite that the
+framework's event model cannot support (keyboard input into owned elements), or
+eliminates dead configuration (`compactMode`).
+
+**Alternatives considered**
+
+1. `TextInputElement` subclass for the Min field — rejected: framework input routing
+   does not deliver keystrokes to owned elements; a screen-level rework is out of scope.
+2. Searching out a host check/cross atlas icon — rejected: none verified in the host
+   `ScreenTextures` atlas; text glyphs already render consistently.
+3. Defaulting `tickInterval` to 15 per DEC-025 — rejected: no in-repo evidence for 15;
+   owner confirmed 4.
+
+**Impact**
+
+- Files: `RerollPanelState` (Min field editing), `RerollPanelLayout` (stepper zones),
+  config (`compactMode` removed; `tickInterval` stays 4), dropdown/status strings
+  (`[x]`/`[ ]`).
+- Supersedes: `F3_AUTO_REROLL_PLAN.md` §4.4 popover-era text (rows now use declarative
+  hover tooltips; `RangeRowElement` in `RerollPanelElement`); the §4.5 config table's
+  `tickInterval` row (default `15` → actual `4`, per DEC-032a).
