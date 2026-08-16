@@ -38,6 +38,7 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 	private static RerollPanelElement instance;
 
 	private final VaultArtisanStationScreen screen;
+	private DropdownListElement dropdown;
 	private int lastHeight;
 	private int lastWidth;
 
@@ -193,9 +194,17 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 
 		// Dropdown list
 		DropdownListElement dropdown = DropdownListElement.create(screen);
+		instance.dropdown = dropdown;
 		instance.addElement(dropdown);
 
 		return instance;
+	}
+
+	/** Keyboard scroll (Up/Down) passthrough to the open dropdown. */
+	public void scrollDropdownBy(int delta) {
+		if (dropdown != null) {
+			dropdown.scrollDropdownBy(delta);
+		}
 	}
 
 	/** The element registered on the current station screen (null until one is open). */

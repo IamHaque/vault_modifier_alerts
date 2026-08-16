@@ -132,8 +132,20 @@ compile (`./gradlew compileJava`).
   required in-game** (side flips, resize, click-outside, tooltip overlap).
 - **3.3 `DropdownListElement` internals**: migrate to
   `VerticalScrollClipContainer` + per-row elements (host scrollbar math).
-  **Deferred**: largest single piece; **explicitly gated on in-game QA of the
-  current build** (owner decision 2026-08-16) before implementation starts.
+  **Done**: `DropdownListElement` is now a `VerticalScrollClipContainer`
+  (header padding + default INSET_GREY background, host scrollbar at the
+  right edge, clipped elastic inner container); each item is a real
+  `DropdownItemRowElement` (`AbstractSpatialElement` + `IRenderedElement` +
+  `IGuiEventElement`) sized `innerWidth()`×`DROPDOWN_ITEM_H`, rebuilt only
+  when the item count changes, with data queried live per frame (name, range,
+  `>`/`*`/`[x]`/`[ ]` markers, remove zone + hover `x`). Scroll triangles and
+  the hand-rolled `dropdownScroll`/`scrollDropdown`/`clampDropdownScroll`
+  math are deleted; scrolling is the host scrollbar (`onMouseScrolled` wheel
+  at any cursor position over the open dropdown, Up/Down keys via
+  `scrollDropdownBy(int)` stepping `1/range` of the normalized value, scroll
+  reset on mode change/reopen). Header click closes the dropdown (legacy
+  triangles were the only scroll affordance; wheel+scrollbar replace them).
+  `RerollPanelLayout`'s unused `dropdownScroll` ctor param removed.
 - **3.4 Tooltip unification**: delete the manual popover
   (`hoverTooltip`/`drawTooltip`/`pendingTooltip`, `TOOLTIP_BG`) once no
   hand-drawn rows remain. Partially done — the three converted rows no longer
@@ -200,10 +212,14 @@ renders inside panel bounds in order at correct width, click at rendered
 location works / click at screen top-left does nothing, slot tooltip overlap
 keeps panel on top, dropdown open/close on all three rows, stepper + Min field
 interactions (numeric and non-numeric targets), and the start/stop button
-tooltip.
+tooltip. New for 3.3: dropdown items are clipped/scrollable via the host
+scrollbar (drag handle, wheel anywhere over the open dropdown, Up/Down keys),
+scroll resets on mode change and on reopen, click-outside closes, and the
+remove-zone hover `x` still works at the row's right edge.
 
-All fixes through commit `d3b6d131` are build-validated but **not yet verified
-in-game**.
+All fixes through commit `0e545e75` are build-validated but **not yet verified
+in-game**; P3.3 (`DropdownListElement` rewrite) is build-validated and also
+awaits in-game QA.
 
 ## Commit discipline
 

@@ -54,7 +54,7 @@ public final class RerollPanelLayout {
 	public final int dropdownY;
 	public final int dropdownEnd;
 
-	public RerollPanelLayout(int x, int y, int width, boolean dropdownOpen, int dropdownCount, int dropdownScroll,
+	public RerollPanelLayout(int x, int y, int width, boolean dropdownOpen, int dropdownCount,
 			int maxDropdownRows) {
 		this.x = x;
 		this.y = y;

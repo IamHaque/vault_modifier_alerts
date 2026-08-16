@@ -41,7 +41,6 @@ public final class RerollPanelState {
 	private String minInputText = "";
 	private boolean minInputFocused;
 	private DropdownMode dropdownMode = DropdownMode.NONE;
-	private int dropdownScroll;
 	private int dropdownMaxRows = RerollPanelLayout.DEFAULT_DROPDOWN_ROWS;
 
 	private RerollPanelState() {
@@ -113,10 +112,6 @@ public final class RerollPanelState {
 
 	public String minInputText() {
 		return minInputText;
-	}
-
-	public int dropdownScroll() {
-		return dropdownScroll;
 	}
 
 	public int dropdownMaxRows() {
@@ -219,12 +214,16 @@ public final class RerollPanelState {
 				closeDropdown();
 				return true;
 			}
+			RerollPanelElement element = RerollPanelElement.getInstance();
+			if (element == null) {
+				return false;
+			}
 			if (keyCode == GLFW.GLFW_KEY_UP || keyCode == GLFW.GLFW_KEY_KP_8) {
-				scrollDropdown(-1);
+				element.scrollDropdownBy(-1);
 				return true;
 			}
 			if (keyCode == GLFW.GLFW_KEY_DOWN || keyCode == GLFW.GLFW_KEY_KP_2) {
-				scrollDropdown(1);
+				element.scrollDropdownBy(1);
 				return true;
 			}
 			return false;
@@ -259,16 +258,6 @@ public final class RerollPanelState {
 
 	public void closeDropdown() {
 		dropdownMode = DropdownMode.NONE;
-		dropdownScroll = 0;
-	}
-
-	public void scrollDropdown(int delta) {
-		if (dropdownMode == DropdownMode.NONE) {
-			return;
-		}
-		int count = dropdownCount();
-		int max = Math.max(0, count - dropdownMaxRows);
-		dropdownScroll = Mth.clamp(dropdownScroll + delta, 0, max);
 	}
 
 	public void toggleDropdown(DropdownMode mode, int count) {
@@ -281,16 +270,6 @@ public final class RerollPanelState {
 			return;
 		}
 		dropdownMode = mode;
-		dropdownScroll = 0;
-		clampDropdownScroll(count, count);
-	}
-
-	public void clampDropdownScroll(int operationCount, int candidateCount) {
-		int count = dropdownMode == DropdownMode.OPERATION ? operationCount
-				: (dropdownMode == DropdownMode.TARGETS ? targets.size()
-						: (dropdownMode == DropdownMode.MODIFIER ? candidateCount : 0));
-		int max = Math.max(0, count - dropdownMaxRows);
-		dropdownScroll = Mth.clamp(dropdownScroll, 0, max);
 	}
 
 	// --------------------------------------------------------------- focus / step
@@ -395,7 +374,7 @@ public final class RerollPanelState {
 	}
 
 	public void updateDropdownCapacity(VaultArtisanStationScreen screen, int x, int y, int currentWidth) {
-		int available = screen.height - (y + new RerollPanelLayout(x, y, currentWidth, false, 0, 0, 0).baseHeight
+		int available = screen.height - (y + new RerollPanelLayout(x, y, currentWidth, false, 0, 0).baseHeight
 				+ RerollPanelLayout.DROPDOWN_HEADER_H);
 		dropdownMaxRows = Mth.clamp(available / RerollPanelLayout.DROPDOWN_ITEM_H,
 				RerollPanelLayout.MIN_DROPDOWN_ROWS, RerollPanelLayout.MAX_DROPDOWN_ROWS);

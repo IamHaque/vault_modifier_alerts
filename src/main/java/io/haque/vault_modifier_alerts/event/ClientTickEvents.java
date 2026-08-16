@@ -7,6 +7,7 @@ import io.haque.vault_modifier_alerts.feature.downed.DownedAlertEngine;
 import io.haque.vault_modifier_alerts.feature.expiry.ExpiryAlertEngine;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
+import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelElement;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout;
 import io.haque.vault_modifier_alerts.tracker.ModifierTracker;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
@@ -99,7 +100,9 @@ public final class ClientTickEvents {
 	/**
 	 * Mouse-wheel scrolling for an open dropdown. Handled at screen level (the
 	 * same proven path as keys/chars/mouse-clicks) so it fires exactly once even
-	 * if the framework also dispatches wheel events to its own elements.
+	 * if the framework also dispatches wheel events to its own elements; the
+	 * event is routed into the element tree so the host scrollbar consumes it
+	 * when the list overflows.
 	 */
 	@SubscribeEvent
 	public static void onScreenMouseScrolled(ScreenEvent.MouseScrollEvent.Pre event) {
@@ -115,7 +118,8 @@ public final class ClientTickEvents {
 				|| event.getMouseY() < bounds.y() || event.getMouseY() >= bounds.y() + bounds.height()) {
 			return;
 		}
-		if (panel.handleScroll(event.getScrollDelta())) {
+		RerollPanelElement element = RerollPanelElement.getInstance();
+		if (element != null && element.onMouseScrolled(event.getMouseX(), event.getMouseY(), event.getScrollDelta())) {
 			event.setCanceled(true);
 		}
 	}

@@ -1,57 +1,55 @@
 package io.haque.vault_modifier_alerts.feature.reroll.ui;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
-import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
 import io.haque.vault_modifier_alerts.feature.reroll.ModifierCatalog;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanel;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelLayout;
 import io.haque.vault_modifier_alerts.feature.reroll.RerollPanelState;
-import iskallia.vault.client.gui.framework.element.ContainerElement;
+import iskallia.vault.client.gui.framework.element.VerticalScrollClipContainer;
 import iskallia.vault.client.gui.framework.render.spi.IElementRenderer;
-import iskallia.vault.client.gui.framework.render.spi.ITooltipRenderer;
+import iskallia.vault.client.gui.framework.screen.layout.ScreenLayout;
+import iskallia.vault.client.gui.framework.spatial.Padding;
 import iskallia.vault.client.gui.framework.spatial.Spatials;
 import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.gear.modification.GearModificationAction;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiComponent;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Dropdown list element for the auto-reroll panel. Renders header with
- * scroll triangles and a scrollable list of items. Replaces the hand-drawn
- * {@code drawDropdown()} in {@link RerollPanel}.
+ * Dropdown list element for the auto-reroll panel, backed by the host's
+ * {@link VerticalScrollClipContainer}: the background, the clip region, the
+ * elastic inner container and the scrollbar are all framework widgets, and
+ * every visible item is a real per-row element
+ * ({@link DropdownItemRowElement}). Replaces the hand-rolled item loop,
+ * scroll triangles and scroll math that lived here before.
  */
-public class DropdownListElement extends ContainerElement<DropdownListElement> {
+public class DropdownListElement extends VerticalScrollClipContainer<DropdownListElement> {
 
-	private VaultArtisanStationScreen screen;
+	private final VaultArtisanStationScreen screen;
+	private final List<DropdownItemRowElement> rows = new ArrayList<>();
+	private RerollPanelState.DropdownMode lastMode;
 
 	private DropdownListElement(VaultArtisanStationScreen screen) {
-		super(Spatials.size(0, 0));
+		super(Spatials.zero(), Padding.of(0, 0, RerollPanelLayout.DROPDOWN_HEADER_H, 0));
 		this.screen = screen;
 	}
 
 	public static DropdownListElement create(VaultArtisanStationScreen screen) {
 		DropdownListElement element = new DropdownListElement(screen);
 		element.layout((screenSize, gui, parent, world) -> {
-			RerollPanel panel = RerollPanel.getInstance();
-			if (!panel.isVisible()) {
-				return;
-			}
-			RerollPanelState state = RerollPanelState.getInstance();
-			if (!state.isDropdownOpen()) {
+			if (!element.isVisible()) {
 				world.positionXY(0, 0);
 				world.width(0);
 				world.height(0);
 				return;
 			}
-			RerollPanelLayout layout = panel.computeLayout(
-					parent.x(), parent.y(), parent.width());
+			RerollPanelLayout layout = RerollPanel.getInstance().computeLayout(parent.x(), parent.y(), parent.width());
 			world.positionXY(layout.x, layout.dropdownY);
 			world.width(layout.width);
 			world.height(layout.dropdownHeight);
@@ -71,151 +69,32 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 
 	@Override
 	public void render(IElementRenderer renderer, PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-		RerollPanel panel = RerollPanel.getInstance();
-		if (!panel.isVisible()) {
+		if (!isVisible()) {
+			lastMode = null;
 			return;
 		}
 		RerollPanelState state = RerollPanelState.getInstance();
-		if (!state.isDropdownOpen()) {
-			return;
+		if (state.dropdownMode() != lastMode) {
+			lastMode = state.dropdownMode();
+			verticalScrollBarElement.setValue(0f);
 		}
-		RerollPanelLayout layout = panel.computeLayout(
-				this.x(), this.y() - RerollPanelLayout.TITLE_H, this.width());
+		refreshRowsIfNeeded();
+		super.render(renderer, poseStack, mouseX, mouseY, partialTick);
 
 		Font font = Minecraft.getInstance().font;
-
-		GuiComponent.fill(poseStack, x(), y(), x() + width(), y() + height(), RerollTokens.DROPDOWN_BG);
+		String header = state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION
+				? "Operations"
+				: (state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS ? "Targets" : "Modifiers");
+		font.draw(poseStack, header, x() + width() / 2f - font.width(header) / 2f, y() + 3, RerollTokens.ACCENT_GOLD());
 		GuiComponent.fill(poseStack, x(), y(), x() + width(), y() + 1, RerollTokens.ACCENT_GOLD());
-
-		boolean operationDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION;
-		boolean targetDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS;
-		String header = operationDropdown ? "Operations" : (targetDropdown ? "Targets" : "Modifiers");
-		int headerWidth = font.width(header);
-		font.draw(poseStack, header, x() + width() / 2 - headerWidth / 2, y() + 3, RerollTokens.ACCENT_GOLD());
-
-		int count = getItemCount();
-		int visible = layout.dropdownVisibleItems;
-		boolean scrollable = count > visible;
-		boolean canScrollUp = scrollable && state.dropdownScroll() > 0;
-		boolean canScrollDown = scrollable && state.dropdownScroll() < count - visible;
-		drawTriangle(poseStack, x() + 7, y() + 6, true,
-				canScrollUp ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);
-		drawTriangle(poseStack, x() + width() - 7, y() + 6, false,
-				canScrollDown ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);
-
-		for (int slot = 0; slot < visible; slot++) {
-			int index = state.dropdownScroll() + slot;
-			if (index >= count) {
-				break;
-			}
-			int itemY = y() + RerollPanelLayout.DROPDOWN_HEADER_H + slot * RerollPanelLayout.DROPDOWN_ITEM_H;
-			renderItem(poseStack, index, itemY, mouseX, mouseY);
-		}
-	}
-
-	private void renderItem(PoseStack poseStack, int index, int itemY, int mouseX, int mouseY) {
-		RerollPanelState state = RerollPanelState.getInstance();
-		boolean operationDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION;
-		boolean targetDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS;
-		Font font = Minecraft.getInstance().font;
-
-		String name = getItemName(index);
-		String range = getItemRange(index);
-		boolean current = operationDropdown ? index == state.operationIndex()
-				: (targetDropdown ? index == state.focusedTarget() : false);
-		boolean hovered = mouseX >= x() && mouseX < x() + width()
-				&& mouseY >= itemY && mouseY < itemY + RerollPanelLayout.DROPDOWN_ITEM_H;
-		boolean removeZone = targetDropdown && mouseX >= x() + width() - 16 && hovered;
-
-		if (hovered) {
-			GuiComponent.fill(poseStack, x(), itemY, x() + width(), itemY + RerollPanelLayout.DROPDOWN_ITEM_H,
-					removeZone ? RerollTokens.DROPDOWN_REMOVE_HOVER : RerollTokens.ROW_HOVER);
-		}
-
-		int baseColor = current ? RerollTokens.ACCENT_GOLD()
-				: (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);
-
-		if (current || (!targetDropdown && !operationDropdown && isWatchedItem(index))) {
-			font.draw(poseStack, targetDropdown || operationDropdown ? ">" : "*",
-					x() + 2, itemY + 3, RerollTokens.ACCENT_GOLD());
-		}
-
-		if (targetDropdown && AutoRerollEngine.getInstance().isRunning() && index < state.targets().size()) {
-			boolean met = AutoRerollEngine.getInstance().isMet(index);
-			font.draw(poseStack, met ? "[x]" : "[ ]", x() + 2, itemY + 3,
-					met ? RerollTokens.STATE_SUCCESS() : RerollTokens.STATE_DANGER());
-		}
-
-		int rangeWidth = range.isEmpty() ? 0 : font.width(range);
-		int nameMax = x() + width() - RerollPanelLayout.PAD_X - rangeWidth - 8;
-		String shownName = RerollPanel.truncate(name, Math.max(8, (nameMax - x()) / 7));
-		font.draw(poseStack, shownName, x() + 11, itemY + 3, baseColor);
-
-		if (!range.isEmpty() && !removeZone) {
-			int rangeX = x() + width() - RerollPanelLayout.PAD_X;
-			font.draw(poseStack, range, rangeX - font.width(range), itemY + 3, RerollTokens.TEXT_MUTED);
-		}
-
-		if (removeZone) {
-			font.draw(poseStack, "x", x() + width() - 12, itemY + 3, RerollTokens.STATE_DANGER());
-		}
 	}
 
 	@Override
 	public boolean onMouseClicked(double mouseX, double mouseY, int button) {
-		if (button != 0 || !isVisible()) {
+		if (!isVisible()) {
 			return false;
 		}
-		RerollPanel panel = RerollPanel.getInstance();
-		RerollPanelState state = RerollPanelState.getInstance();
-
-		if (mouseY < y() + RerollPanelLayout.DROPDOWN_HEADER_H) {
-			if (mouseX < x() + 14) {
-				state.scrollDropdown(-1);
-				return true;
-			}
-			if (mouseX >= x() + width() - 14) {
-				state.scrollDropdown(1);
-				return true;
-			}
-			return false;
-		}
-
-		RerollPanelLayout layout = panel.computeLayout(
-				this.x(), this.y() - RerollPanelLayout.TITLE_H, this.width());
-		int slot = (int) (mouseY - y() - RerollPanelLayout.DROPDOWN_HEADER_H) / RerollPanelLayout.DROPDOWN_ITEM_H;
-		int count = getItemCount();
-		int index = state.dropdownScroll() + slot;
-		if (slot < 0 || slot >= layout.dropdownVisibleItems || index >= count) {
-			return false;
-		}
-
-		boolean targetDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS;
-		boolean inRemoveZone = targetDropdown && mouseX >= x() + width() - 16;
-
-		if (targetDropdown) {
-			if (inRemoveZone) {
-				state.removeTarget(index);
-			} else {
-				state.focusTarget(index);
-			}
-		} else if (state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION) {
-			List<GearModificationAction> operations = panel.operations(screen);
-			if (index >= 0 && index < operations.size()) {
-				state.selectOperation(index);
-				state.closeDropdown();
-			}
-		} else if (state.dropdownMode() == RerollPanelState.DropdownMode.MODIFIER) {
-			ItemStack gear = RerollPanel.stationGear();
-			List<GearModificationAction> operations = panel.operations(screen);
-			int safeIndex = Math.min(state.operationIndex(), operations.size() - 1);
-			List<ModifierCatalog.Candidate> cands = panel.candidates(gear, operations.get(safeIndex));
-			if (index >= 0 && index < cands.size()) {
-				state.toggleTarget(cands.get(index).id());
-				state.closeDropdown();
-			}
-		}
-		return true;
+		return super.onMouseClicked(mouseX, mouseY, button);
 	}
 
 	@Override
@@ -223,56 +102,93 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 		if (!isVisible()) {
 			return false;
 		}
-		if (mouseX >= x() && mouseX < x() + width() && mouseY >= y() && mouseY < y() + height()) {
-			RerollPanelState state = RerollPanelState.getInstance();
-			if (delta > 0) {
-				state.scrollDropdown(-1);
-			} else if (delta < 0) {
-				state.scrollDropdown(1);
-			}
-			return true;
-		}
-		return false;
+		return super.onMouseScrolled(mouseX, mouseY, delta);
 	}
 
-	private int getItemCount() {
+	/**
+	 * Keyboard scrolling (Up/Down arrows): steps one row per keypress by
+	 * re-deriving the scrollbar's normalized value from the current item count
+	 * and the number of rows that fit the open dropdown.
+	 */
+	public void scrollDropdownBy(int delta) {
+		if (!isVisible()) {
+			return;
+		}
+		int count = itemCount();
+		int visible = (height() - RerollPanelLayout.DROPDOWN_HEADER_H) / RerollPanelLayout.DROPDOWN_ITEM_H;
+		int range = count - visible;
+		if (range <= 0) {
+			return;
+		}
+		float value = Mth.clamp(verticalScrollBarElement.getValue() + delta / (float) range, 0f, 1f);
+		verticalScrollBarElement.setValue(value);
+		ScreenLayout.requestLayout();
+	}
+
+	// --------------------------------------------------------------- row
+	// management
+
+	private void refreshRowsIfNeeded() {
+		int count = itemCount();
+		if (count == rows.size()) {
+			return;
+		}
+		for (DropdownItemRowElement row : rows) {
+			removeElement(row);
+		}
+		rows.clear();
+		for (int index = 0; index < count; index++) {
+			final int rowIndex = index;
+			DropdownItemRowElement row = new DropdownItemRowElement(this, screen, rowIndex);
+			row.layout((screenSize, gui, parent, world) -> {
+				world.positionXY(parent.x(), parent.y() + rowIndex * RerollPanelLayout.DROPDOWN_ITEM_H);
+				world.width(innerWidth());
+				world.height(RerollPanelLayout.DROPDOWN_ITEM_H);
+			});
+			addElement(row);
+			rows.add(row);
+		}
+		ScreenLayout.requestLayout();
+	}
+
+	// --------------------------------------------------------------- item data
+	// (queried live by the row elements each frame)
+
+	int itemCount() {
 		RerollPanelState state = RerollPanelState.getInstance();
 		RerollPanel panel = RerollPanel.getInstance();
 		if (state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION) {
 			return panel.operations(screen).size();
 		} else if (state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS) {
 			return state.targets().size();
-		} else {
-			List<GearModificationAction> operations = panel.operations(screen);
-			ItemStack gear = RerollPanel.stationGear();
-			if (operations.isEmpty() || gear.isEmpty()) {
-				return 0;
-			}
-			int safeIndex = Math.min(state.operationIndex(), operations.size() - 1);
-			return panel.candidates(gear, operations.get(safeIndex)).size();
 		}
+		List<GearModificationAction> operations = panel.operations(screen);
+		ItemStack gear = RerollPanel.stationGear();
+		if (operations.isEmpty() || gear.isEmpty()) {
+			return 0;
+		}
+		int safeIndex = Math.min(state.operationIndex(), operations.size() - 1);
+		return panel.candidates(gear, operations.get(safeIndex)).size();
 	}
 
-	private String getItemName(int index) {
+	String itemName(int index) {
 		RerollPanelState state = RerollPanelState.getInstance();
 		RerollPanel panel = RerollPanel.getInstance();
 		if (state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION) {
 			return panel.displayOperationName(panel.operations(screen).get(index));
 		} else if (state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS) {
 			return panel.targetName(state.targets().get(index).id());
-		} else {
-			List<GearModificationAction> operations = panel.operations(screen);
-			ItemStack gear = RerollPanel.stationGear();
-			int safeIndex = Math.min(state.operationIndex(), operations.size() - 1);
-			List<ModifierCatalog.Candidate> cands = panel.candidates(gear, operations.get(safeIndex));
-			return cands.get(index).displayName();
 		}
+		List<GearModificationAction> operations = panel.operations(screen);
+		ItemStack gear = RerollPanel.stationGear();
+		int safeIndex = Math.min(state.operationIndex(), operations.size() - 1);
+		List<ModifierCatalog.Candidate> cands = panel.candidates(gear, operations.get(safeIndex));
+		return cands.get(index).displayName();
 	}
 
-	private String getItemRange(int index) {
+	String itemRange(int index) {
 		RerollPanelState state = RerollPanelState.getInstance();
 		RerollPanel panel = RerollPanel.getInstance();
-		boolean operationDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION;
 		boolean targetDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS;
 
 		if (targetDropdown) {
@@ -281,7 +197,7 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 					? "min " + RerollPanel.formatDisplay(target.thresholdValue(), false)
 					: "any";
 		}
-		if (operationDropdown) {
+		if (state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION) {
 			int cost = RerollPanel.potentialCost(RerollPanel.stationGear(), panel.operations(screen).get(index));
 			return cost > 0 ? cost + " potential" : "";
 		}
@@ -295,7 +211,7 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 		return "";
 	}
 
-	private boolean isWatchedItem(int index) {
+	boolean isWatchedItem(int index) {
 		RerollPanelState state = RerollPanelState.getInstance();
 		RerollPanel panel = RerollPanel.getInstance();
 		if (state.dropdownMode() != RerollPanelState.DropdownMode.MODIFIER) {
@@ -306,45 +222,5 @@ public class DropdownListElement extends ContainerElement<DropdownListElement> {
 		int safeIndex = Math.min(state.operationIndex(), operations.size() - 1);
 		List<ModifierCatalog.Candidate> cands = panel.candidates(gear, operations.get(safeIndex));
 		return index < cands.size() && panel.isWatched(cands.get(index).id());
-	}
-
-	@Override
-	public boolean onHoverTooltip(ITooltipRenderer renderer, PoseStack poseStack,
-			int mouseX, int mouseY, TooltipFlag flag) {
-		RerollPanelState state = RerollPanelState.getInstance();
-		if (!isVisible() || mouseY < y() + RerollPanelLayout.DROPDOWN_HEADER_H) {
-			return false;
-		}
-		int slot = (mouseY - y() - RerollPanelLayout.DROPDOWN_HEADER_H) / RerollPanelLayout.DROPDOWN_ITEM_H;
-		RerollPanel panel = RerollPanel.getInstance();
-		RerollPanelLayout layout = panel.computeLayout(this.x(), this.y() - RerollPanelLayout.TITLE_H, this.width());
-		if (slot < 0 || slot >= layout.dropdownVisibleItems) {
-			return false;
-		}
-		int index = state.dropdownScroll() + slot;
-		if (index >= getItemCount()) {
-			return false;
-		}
-		String fullName = getItemName(index);
-		Font font = Minecraft.getInstance().font;
-		String range = getItemRange(index);
-		int rangeWidth = range.isEmpty() ? 0 : font.width(range);
-		int nameMax = x() + width() - RerollPanelLayout.PAD_X - rangeWidth - 8;
-		String shownName = RerollPanel.truncate(fullName, Math.max(8, (nameMax - x()) / 7));
-		if (!shownName.equals(fullName)) {
-			renderer.renderComponentTooltip(poseStack,
-					java.util.List.of(new TextComponent(fullName)),
-					mouseX, mouseY,
-					iskallia.vault.client.gui.framework.render.TooltipDirection.LEFT);
-			return true;
-		}
-		return false;
-	}
-
-	private static void drawTriangle(PoseStack poseStack, int centerX, int topY, boolean up, int color) {
-		for (int i = 0; i < 3; i++) {
-			int rowY = up ? topY + (2 - i) : topY + i;
-			GuiComponent.fill(poseStack, centerX - i, rowY, centerX + i + 1, rowY + 1, color);
-		}
 	}
 }

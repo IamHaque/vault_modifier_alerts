@@ -147,14 +147,6 @@ public final class RerollPanel {
 		state.closeDropdown();
 	}
 
-	public boolean handleScroll(double delta) {
-		if (!state.isDropdownOpen()) {
-			return false;
-		}
-		state.scrollDropdown(delta > 0 ? -1 : 1);
-		return true;
-	}
-
 	// --------------------------------------------------------- screen-dependent
 	// model queries
 
@@ -293,13 +285,13 @@ public final class RerollPanel {
 	public RerollPanelLayout computeLayout(int x, int y) {
 		int count = state.dropdownCount();
 		return new RerollPanelLayout(x, y, currentWidth, state.isDropdownOpen(), count,
-				state.dropdownScroll(), state.dropdownMaxRows());
+				state.dropdownMaxRows());
 	}
 
 	public RerollPanelLayout computeLayout(int x, int y, int width) {
 		int count = state.dropdownCount();
 		return new RerollPanelLayout(x, y, width, state.isDropdownOpen(), count,
-				state.dropdownScroll(), state.dropdownMaxRows());
+				state.dropdownMaxRows());
 	}
 
 	public static int computeWidth(int screenWidth, int guiLeft, int guiRight) {
@@ -338,7 +330,6 @@ public final class RerollPanel {
 		clampSelections(operations, gear);
 		GearModificationAction operation = operations.isEmpty() ? null : operations.get(state.operationIndex());
 		List<Candidate> candidates = operation == null ? List.of() : candidates(gear, operation);
-		state.clampDropdownScroll(operations.size(), candidates.size());
 		RerollPanelLayout layout = computeLayout(x, y);
 		pendingTooltip = null;
 
@@ -383,9 +374,6 @@ public final class RerollPanel {
 		}
 		ItemStack gear = stationGear();
 		clampSelections(operations, gear);
-		int operationCount = operations.size();
-		int candidateCount = candidates(gear, operations.get(state.operationIndex())).size();
-		state.clampDropdownScroll(operationCount, candidateCount);
 		RerollPanelLayout layout = computeLayout(x, y);
 		Hit hit = layout.regionAt(mouseX, mouseY);
 
