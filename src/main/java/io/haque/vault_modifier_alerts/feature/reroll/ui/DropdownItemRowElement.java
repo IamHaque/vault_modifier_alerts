@@ -106,6 +106,9 @@ final class DropdownItemRowElement extends AbstractSpatialElement<DropdownItemRo
 		if (button != 0 || !dropdown.isVisible()) {
 			return false;
 		}
+		if (AutoRerollEngine.getInstance().isRunning()) {
+			return false;
+		}
 		RerollPanelState state = RerollPanelState.getInstance();
 		boolean targetDropdown = state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS;
 		boolean inRemoveZone = targetDropdown && mouseX >= x() + width() - 16;

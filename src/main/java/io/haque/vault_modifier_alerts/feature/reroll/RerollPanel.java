@@ -342,6 +342,9 @@ public final class RerollPanel {
 		if (!hitTest(x, y, width, height, mouseX, mouseY)) {
 			return false;
 		}
+		if (AutoRerollEngine.getInstance().isRunning()) {
+			return false;
+		}
 		// Right-click on Min field clears the threshold (Phase 5.1)
 		if (button == 1) {
 			RerollPanelLayout layout = computeLayout(x, y);

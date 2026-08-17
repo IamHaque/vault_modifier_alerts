@@ -118,10 +118,29 @@ public final class RerollPanelState {
 		return dropdownMaxRows;
 	}
 
+	// --------------------------------------------------------------- run-lock
+	// guard
+
+	/**
+	 * Returns {@code true} when a reroll run is in progress and all selection
+	 * mutations must be refused. As a side-effect the running engine is
+	 * stopped (per the rule: "If done, the reroll should stop").
+	 */
+	private boolean selectionLocked() {
+		if (AutoRerollEngine.getInstance().isRunning()) {
+			AutoRerollEngine.getInstance().stop(AutoRerollEngine.StopReason.STOPPED, false);
+			return true;
+		}
+		return false;
+	}
+
 	// --------------------------------------------------------------- selection
 	// mutations
 
 	public void selectOperation(int index) {
+		if (selectionLocked()) {
+			return;
+		}
 		if (index == operationIndex) {
 			return;
 		}
@@ -130,6 +149,9 @@ public final class RerollPanelState {
 	}
 
 	public void toggleTarget(ResourceLocation id) {
+		if (selectionLocked()) {
+			return;
+		}
 		for (int i = 0; i < targets.size(); i++) {
 			if (targets.get(i).id().equals(id)) {
 				targets.remove(i);
@@ -148,6 +170,9 @@ public final class RerollPanelState {
 	}
 
 	public void focusTarget(int index) {
+		if (selectionLocked()) {
+			return;
+		}
 		if (index >= 0 && index < targets.size()) {
 			focusedTarget = index;
 		}
@@ -155,6 +180,9 @@ public final class RerollPanelState {
 	}
 
 	public void removeTarget(int index) {
+		if (selectionLocked()) {
+			return;
+		}
 		if (index < 0 || index >= targets.size()) {
 			return;
 		}
@@ -170,6 +198,9 @@ public final class RerollPanelState {
 	// --------------------------------------------------------------- min-input
 
 	public void commitMinInput() {
+		if (selectionLocked()) {
+			return;
+		}
 		RollTarget target = focused();
 		if (target == null) {
 			return;
@@ -192,6 +223,9 @@ public final class RerollPanelState {
 	}
 
 	public boolean acceptChar(char c) {
+		if (selectionLocked()) {
+			return false;
+		}
 		if (!minInputFocused) {
 			return false;
 		}
@@ -232,6 +266,9 @@ public final class RerollPanelState {
 	}
 
 	public boolean inputKey(int keyCode) {
+		if (selectionLocked()) {
+			return false;
+		}
 		if (!minInputFocused) {
 			return false;
 		}
@@ -275,6 +312,9 @@ public final class RerollPanelState {
 	// --------------------------------------------------------------- focus / step
 
 	public void toggleMinFocus() {
+		if (selectionLocked()) {
+			return;
+		}
 		if (dropdownMode != DropdownMode.NONE || focused() == null) {
 			return;
 		}
@@ -300,6 +340,9 @@ public final class RerollPanelState {
 	}
 
 	public void stepMin(double delta) {
+		if (selectionLocked()) {
+			return;
+		}
 		if (focused() == null) {
 			return;
 		}
@@ -401,11 +444,17 @@ public final class RerollPanelState {
 
 	/** Package-private setter for the stop-condition chip toggle. */
 	public void setStopCondition(AutoRerollEngine.StopCondition condition) {
+		if (selectionLocked()) {
+			return;
+		}
 		this.stopCondition = condition;
 	}
 
 	/** Clears the focused target's threshold (right-click clear convention). */
 	public void clearFocusedThreshold() {
+		if (selectionLocked()) {
+			return;
+		}
 		setFocusedThreshold(false, 0.0);
 		minInputText = "";
 	}

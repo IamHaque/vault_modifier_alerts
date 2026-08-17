@@ -135,6 +135,9 @@ public class DropdownRowElement extends AbstractSpatialElement<DropdownRowElemen
 		if (button != 0 || !containsMouse(mouseX, mouseY) || !rowsAvailable()) {
 			return false;
 		}
+		if (AutoRerollEngine.getInstance().isRunning()) {
+			return false;
+		}
 		RerollPanelState state = state();
 		state.loseMinFocus();
 		switch (mode) {

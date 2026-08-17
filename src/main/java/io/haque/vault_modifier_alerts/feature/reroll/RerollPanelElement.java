@@ -90,6 +90,7 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 			world.height(12);
 		});
 		decButton.setDisabled(() -> !VmaClientConfigs.isAutoRerollEnabled()
+				|| AutoRerollEngine.getInstance().isRunning()
 				|| !panel.currentTargetRange().numeric());
 		instance.addElement(decButton);
 
@@ -102,6 +103,7 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 			world.height(12);
 		});
 		incButton.setDisabled(() -> !VmaClientConfigs.isAutoRerollEnabled()
+				|| AutoRerollEngine.getInstance().isRunning()
 				|| !panel.currentTargetRange().numeric());
 		instance.addElement(incButton);
 
@@ -158,6 +160,9 @@ public final class RerollPanelElement extends ContainerElement<RerollPanelElemen
 				"Auto-reset potential",
 				VmaClientConfigs::isAutoResetPotentialEnabled,
 				() -> {
+					if (AutoRerollEngine.getInstance().isRunning()) {
+						return;
+					}
 					RerollPanelState.getInstance().loseMinFocus();
 					VmaClientConfigs.setAutoResetPotential(!VmaClientConfigs.isAutoResetPotentialEnabled());
 				});
