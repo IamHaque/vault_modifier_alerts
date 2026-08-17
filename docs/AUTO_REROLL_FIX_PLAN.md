@@ -259,8 +259,58 @@ All fixes through `09bc9ce5` are build-validated but **not yet verified
 in-game**; the QA round 2 fixes above are build-validated and await the next
 QA session.
 
+### QA round 3 (owner, 2026-08-17) — issues found and fixed
+
+1. **Panel inputs active during a reroll run** — clicking Focus/Modifier/Targets
+   rows, dropdown items, Min steppers/field, stop-condition chip, clear-targets, or
+   auto-reset toggle while a run is in progress could change the selection mid-run.
+   Fix: `RerollPanelState` mutators guarded by `selectionLocked()` (stops the engine
+   on any attempted mutation); `DropdownRowElement`, `DropdownItemRowElement`,
+   `RerollPanel.handleClick`, and stepper disabled lambdas block input while
+   `AutoRerollEngine.isRunning()`. Auto-reset toggle blocked; auto-reroll toggle
+   stays live (OFF = stop switch). Visual: rows grey out while running.
+
+2. **Effect cloud modifiers show "Effect Cloud"** — `EffectCloudAttribute$Reader`
+   hardcodes "Effect Cloud" / "Effect Cloud when Hit"; `CloudConfig.tooltipDisplayName`
+   is private with no getter. Fix: `ModifierCatalog.displayName` detects
+   `EffectCloudAttribute.CloudConfig` tier configs and returns humanized identifier
+   (e.g. `mod_healing_cloud` → "Healing Cloud", `crafted_fear_cloud` → "Crafted Fear
+   Cloud", `regencloud` → "Healing Cloud" manual mapping). Full inventory of 10
+   identifiers verified from all 6 gear_modifiers JSONs. See DEC-033.
+
+3. **Start/Stop button touches panel edges** — full-width layout had no horizontal
+   breathing space. Fix: button spatial inset by `PAD_X` (8px) on each side in the
+   layout lambda; 9-slice renders across the element's bounds so the inset is visual.
+
+### Open in-game QA (after the fixes above)
+
+Run the per-row checklist (§4): LEFT + RIGHT panel side, GUI-scale resize, row
+renders inside panel bounds in order at correct width, click at rendered location
+works / click at screen top-left does nothing, slot tooltip overlap keeps panel on
+top, dropdown open/close on all three rows, stepper + Min field interactions
+(numeric and non-numeric targets), and the start/stop button tooltip. New for 3.3:
+dropdown items are clipped/scrollable via the host scrollbar (drag handle, wheel
+anywhere over the open dropdown, Up/Down keys), scroll resets on mode change and on
+reopen, click-outside closes, and the remove-zone hover `x` still works at the row's
+right edge. New for QA round 3: verify that panel inputs are locked while a run is
+in progress (steppers greyed, dropdown items non-clickable, auto-reset toggle
+non-clickable, Min field/steppers non-functional), effect cloud names show per-type
+labels (Healing Cloud, Fear Cloud, Poison Cloud, Chilling Cloud, Crafted variants,
+and Regen Cloud on drink items), and the Start/Stop button has visible side padding.
+
+All fixes through `be3d89d8` are build-validated but **not yet verified
+in-game**; the QA round 3 fixes above are build-validated and await the next
+QA session.
+
 ## Commit discipline
 
 Commit after each concrete phase once `./gradlew compileJava` (and `build`
 where noted) passes. Conventional commit style (`fix(reroll): ...`,
 `chore(reroll): ...`) matching the repo history.
+
+Commits (newest first):
+- `be3d89d8` fix(reroll): inset Start/Stop button with PAD_X side breathing space
+- `26105b9d` fix(reroll): show effect cloud names (Healing Cloud, Fear Cloud, etc.)
+- `618f957a` fix(reroll): lock panel inputs while reroll run is in progress
+- `c17e3699` fix(reroll): vma reroll disable now hides the panel too
+- `56ec767a` docs(reroll): record DEC-032 decisions, supersede F3 plan notes

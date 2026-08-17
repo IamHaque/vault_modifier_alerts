@@ -99,6 +99,7 @@ Why this option over the alternatives.
 | DEC-030 | Effect-avoidance chance ranges, name fixes, status wording, reset counter | RESOLVED | 2026-08-15 |
 | DEC-031 | Multi-target watch list: per-target mins, stop condition, picker UX | RESOLVED | 2026-08-15 |
 | DEC-032 | F3 panel input/editing decisions (a–e): tickInterval, Min field, steppers, markers, compactMode | RESOLVED | 2026-08-16 |
+| DEC-033 | F3 effect cloud display names: identifier-based labels instead of generic "Effect Cloud" | RESOLVED | 2026-08-17 |
 
 ---
 
@@ -1673,3 +1674,63 @@ eliminates dead configuration (`compactMode`).
 - Supersedes: `F3_AUTO_REROLL_PLAN.md` §4.4 popover-era text (rows now use declarative
   hover tooltips; `RangeRowElement` in `RerollPanelElement`); the §4.5 config table's
   `tickInterval` row (default `15` → actual `4`, per DEC-032a).
+
+---
+
+### DEC-033 — F3 effect cloud display names: identifier-based labels
+
+- **Date:** 2026-08-17
+- **Status:** RESOLVED
+- **Category:** Design
+
+**Context**
+Owner QA found that all effect-cloud modifiers in the F3 panel showed the generic
+reader name "Effect Cloud" (hardcoded in `EffectCloudAttribute$Reader`) instead of
+the cloud type. The `tooltipDisplayName` field on `CloudConfig` is private with no
+public getter, so reflection would be required to read it at runtime.
+
+**Decision**
+Display names derived from the tier-group identifier path via the existing
+`humanizeId(stripModPrefix(...))` chain:
+
+| Identifier | Label |
+|---|---|
+| mod_healing_cloud | Healing Cloud |
+| mod_poison_cloud | Poison Cloud |
+| mod_fear_cloud | Fear Cloud |
+| mod_chilling_cloud | Chilling Cloud |
+| crafted_healing_cloud | Crafted Healing Cloud |
+| crafted_poison_cloud | Crafted Poison Cloud |
+| crafted_fear_cloud | Crafted Fear Cloud |
+| crafted_chilling_cloud | Crafted Chilling Cloud |
+| crafted_slowness_cloud | Crafted Slowness Cloud |
+| regencloud | Healing Cloud (manual mapping) |
+
+The `crafted_` prefix distinguishes crafted variants from regular ones in the same
+sword/axe/wand catalog (both share the same tooltipDisplayName). `regencloud` uses
+a manual mapping because its single-word identifier humanizes to "Regencloud" which
+reads poorly; its tooltipDisplayName is "Healing" and it never appears in the same
+catalog as `mod_healing_cloud`.
+
+**Rationale**
+Identifier humanization is reflection-free, uses the existing `humanizeId` chain, and
+produces labels that exactly match the owner's requested wording ("Healing Cloud",
+"Fear Cloud"). The `crafted_` prefix is a natural by-product that improves
+distinguishability.
+
+**Alternatives considered**
+
+1. Reflect on `CloudConfig.tooltipDisplayName` — rejected: fragile (private field
+   with no getter), and would produce identical labels for crafted vs. regular
+   variants (both share tooltipDisplayName "Healing"), causing duplicate rows in the
+   same catalog.
+2. Use `EffectCloudAttribute.getPrimaryEffect()` → MobEffect → translate — rejected:
+   gives effect names like "Instant Health" not "Healing"; custom VH effects (fear's
+   `taunt_repel_mob`) may not translate.
+
+**Impact**
+
+- Files: `ModifierCatalog.displayName`, new `cloudDisplayName` helper.
+- The targets row and dropdown items now show per-type cloud names.
+
+---
