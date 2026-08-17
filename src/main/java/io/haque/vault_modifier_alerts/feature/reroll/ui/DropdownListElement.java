@@ -86,7 +86,7 @@ public class DropdownListElement extends VerticalScrollClipContainer<DropdownLis
 		String header = state.dropdownMode() == RerollPanelState.DropdownMode.OPERATION
 				? "Operations"
 				: (state.dropdownMode() == RerollPanelState.DropdownMode.TARGETS ? "Targets" : "Modifiers");
-		font.draw(poseStack, header, x() + width() / 2f - font.width(header) / 2f, y() + 3, RerollTokens.ACCENT_GOLD());
+		font.draw(poseStack, header, x() + width() / 2f - font.width(header) / 2f, y() + RerollPanelLayout.TEXT_BASELINE_OFFSET, RerollTokens.ACCENT_GOLD());
 		GuiComponent.fill(poseStack, x(), y(), x() + width(), y() + 1, RerollTokens.ACCENT_GOLD());
 	}
 

@@ -69,7 +69,7 @@ public class StartStopButtonElement extends ButtonElement<StartStopButtonElement
 		} else if (state.canStart()) {
 			color = RerollTokens.STATE_SUCCESS();
 		} else {
-			color = RerollTokens.TEXT_DISABLED;
+			color = RerollTokens.TEXT_DISABLED();
 		}
 		font.draw(poseStack, label, centerX - textWidth / 2.0f, textY, color);
 	}

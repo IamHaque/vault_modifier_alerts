@@ -25,6 +25,11 @@ public final class RerollPanelLayout {
 	public static final int MIN_DROPDOWN_ROWS = 3;
 	public static final int MAX_DROPDOWN_ROWS = 8;
 
+	// Text layout tokens (§4, §12 Design Guidelines)
+	public static final int TEXT_BASELINE_OFFSET = 3;
+	public static final int MIN_LABEL_X = 22;
+	public static final int STEPPER_ZONE_W = 16;
+
 	public 	enum HitType {
 		NONE, MIN_DEC, MIN_FIELD, MIN_INC
 	}
@@ -107,10 +112,10 @@ public final class RerollPanelLayout {
 			return Hit.MISS;
 		}
 		if (inside(mouseY, minY, ROW_H)) {
-			if (mouseX < x + 16) {
+			if (mouseX < x + STEPPER_ZONE_W) {
 				return new Hit(HitType.MIN_DEC, -1);
 			}
-			if (mouseX >= x + width - 16) {
+			if (mouseX >= x + width - STEPPER_ZONE_W) {
 				return new Hit(HitType.MIN_INC, -1);
 			}
 			if (mouseX >= minFieldLeft() && mouseX < minFieldRight()) {

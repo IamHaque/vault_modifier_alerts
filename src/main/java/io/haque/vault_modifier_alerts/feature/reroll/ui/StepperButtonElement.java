@@ -37,7 +37,7 @@ public class StepperButtonElement extends ButtonElement<StepperButtonElement> {
 		TextureAtlasRegion region = textures.selectTexture(isDisabled(), containsMouse(mouseX, mouseY), clickHeld);
 		renderer.render(region, poseStack, worldSpatial, worldSpatial);
 		Font font = Minecraft.getInstance().font;
-		int color = isDisabled() ? RerollTokens.TEXT_DISABLED : RerollTokens.TEXT_DEFAULT();
+		int color = isDisabled() ? RerollTokens.TEXT_DISABLED() : RerollTokens.TEXT_DEFAULT();
 		int textWidth = font.width(glyph);
 		font.draw(poseStack, glyph, x() + width() / 2 - textWidth / 2.0f, y() + (height() - 8) / 2, color);
 	}

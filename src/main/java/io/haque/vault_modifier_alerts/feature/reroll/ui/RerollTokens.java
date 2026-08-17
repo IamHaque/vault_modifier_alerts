@@ -20,14 +20,14 @@ public final class RerollTokens {
 
 	// Text (configurable)
 	public static int TEXT_DEFAULT() { return VmaClientConfigs.panelTextColor(); }
-	public static final int TEXT_MUTED = 0xFFA0A0A0;
-	public static final int TEXT_DISABLED = 0xFF707070;
+	public static int TEXT_MUTED() { return VmaClientConfigs.panelMutedColor(); }
+	public static int TEXT_DISABLED() { return VmaClientConfigs.panelDisabledColor(); }
 
 	// State (configurable)
 	public static int STATE_SUCCESS() { return VmaClientConfigs.panelSuccessColor(); }
 	public static int STATE_DANGER() { return VmaClientConfigs.panelDangerColor(); }
-	public static final int ROW_HOVER = 0xFF3A3A3A;
-	public static final int ROW_OPEN = 0xFF543C1F;
+	public static int ROW_HOVER() { return VmaClientConfigs.panelRowHoverColor(); }
+	public static int ROW_OPEN() { return VmaClientConfigs.panelRowOpenColor(); }
 
 	// Input
 	public static final int INPUT_BG = 0xFF2E2E2E;

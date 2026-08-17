@@ -34,7 +34,7 @@ public class CounterRowElement extends ContainerElement<CounterRowElement> {
 			return;
 		}
 		int resets = engine.potentialResetsThisSession();
-		font.draw(poseStack, "Potential reset x " + resets, x() + RerollPanelLayout.PAD_X, y() + 3,
-				RerollTokens.TEXT_MUTED);
+		font.draw(poseStack, "Potential reset x " + resets, x() + RerollPanelLayout.PAD_X, y() + RerollPanelLayout.TEXT_BASELINE_OFFSET,
+				RerollTokens.TEXT_MUTED());
 	}
 }

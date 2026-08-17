@@ -48,7 +48,7 @@ public class ToggleRowElement extends AbstractSpatialElement<ToggleRowElement>
 		boolean hovered = containsMouse(mouseX, mouseY);
 		if (hovered) {
 			GuiComponent.fill(poseStack, x() + 1, y(), x() + width() - 1,
-					y() + height(), RerollTokens.ROW_HOVER);
+					y() + height(), RerollTokens.ROW_HOVER());
 		}
 		TextureAtlasRegion icon = enabled
 				? (hovered ? ScreenTextures.BUTTON_TOGGLE_ON_HOVER : ScreenTextures.BUTTON_TOGGLE_ON)
@@ -57,8 +57,8 @@ public class ToggleRowElement extends AbstractSpatialElement<ToggleRowElement>
 				Spatials.positionXY(x() + RerollPanelLayout.PAD_X, y() + 1),
 				Spatials.size(12, 12));
 		net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
-		font.draw(poseStack, label, x() + 26, y() + 3,
-				enabled ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);
+		font.draw(poseStack, label, x() + 26, y() + RerollPanelLayout.TEXT_BASELINE_OFFSET,
+				enabled ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED());
 	}
 
 	@Override

@@ -1,5 +1,6 @@
 package io.haque.vault_modifier_alerts.feature.reroll.ui;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine;
@@ -86,15 +87,15 @@ public class DropdownRowElement extends AbstractSpatialElement<DropdownRowElemen
 		boolean rowHovered = hovered && !chipHovered && !clearHovered;
 
 		if (open) {
-			GuiComponent.fill(poseStack, x + 1, y, x + w - 1, y + h, RerollTokens.ROW_OPEN);
+			GuiComponent.fill(poseStack, x + 1, y, x + w - 1, y + h, RerollTokens.ROW_OPEN());
 		} else if (mode == RerollPanelState.DropdownMode.TARGETS ? rowHovered : hovered) {
-			GuiComponent.fill(poseStack, x + 1, y, x + w - 1, y + h, RerollTokens.ROW_HOVER);
+			GuiComponent.fill(poseStack, x + 1, y, x + w - 1, y + h, RerollTokens.ROW_HOVER());
 		}
 
-		int color = enabled ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED;
+		int color = enabled ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED();
 		String label = mode == RerollPanelState.DropdownMode.OPERATION ? "Focus"
 				: (mode == RerollPanelState.DropdownMode.MODIFIER ? "Modifier" : "Targets");
-		font.draw(poseStack, label, x + RerollPanelLayout.PAD_X, y + 3, RerollTokens.TEXT_MUTED);
+		font.draw(poseStack, label, x + RerollPanelLayout.PAD_X, y + RerollPanelLayout.TEXT_BASELINE_OFFSET, RerollTokens.TEXT_MUTED());
 
 		String value = fullValue();
 		if (mode == RerollPanelState.DropdownMode.TARGETS) {
@@ -103,22 +104,29 @@ public class DropdownRowElement extends AbstractSpatialElement<DropdownRowElemen
 				value = RerollPanel.truncate(value, maxChars);
 			}
 		}
-		font.draw(poseStack, value, x + 62, y + 3, color);
+		font.draw(poseStack, value, x + 62, y + RerollPanelLayout.TEXT_BASELINE_OFFSET, color);
 
-		font.draw(poseStack, "\u2304", x + w - 9, y + 3, color);
+		// Scaled chevron disclosure affordance (§3.8 Design Guidelines)
+		poseStack.pushPose();
+		poseStack.translate(x + w - 9, y + RerollPanelLayout.TEXT_BASELINE_OFFSET, 0);
+		poseStack.scale(1.2F, 1.2F, 1.0F);
+		RenderSystem.disableDepthTest();
+		font.draw(poseStack, "\u2304", 0, 0, 0xFF555555);
+		RenderSystem.enableDepthTest();
+		poseStack.popPose();
 
 		if (mode == RerollPanelState.DropdownMode.TARGETS) {
 			GuiComponent.fill(poseStack, x + w - 44, y, x + w - 26, y + h,
-					clearHovered ? RerollTokens.ROW_HOVER : RerollTokens.DROPDOWN_BG);
+					clearHovered ? RerollTokens.ROW_HOVER() : RerollTokens.DROPDOWN_BG);
 			int xColor = clearHovered ? RerollTokens.STATE_DANGER()
-					: (enabled ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED);
-			font.draw(poseStack, "x", x + w - 35, y + 3, xColor);
+					: (enabled ? RerollTokens.TEXT_MUTED() : RerollTokens.TEXT_DISABLED());
+			font.draw(poseStack, "x", x + w - 35, y + RerollPanelLayout.TEXT_BASELINE_OFFSET, xColor);
 			GuiComponent.fill(poseStack, x + w - 24, y, x + w - 1, y + h,
-					chipHovered ? RerollTokens.ROW_HOVER : RerollTokens.DROPDOWN_BG);
+					chipHovered ? RerollTokens.ROW_HOVER() : RerollTokens.DROPDOWN_BG);
 			int chipColor = chipHovered ? RerollTokens.ACCENT_GOLD()
-					: (enabled ? RerollTokens.TEXT_MUTED : RerollTokens.TEXT_DISABLED);
+					: (enabled ? RerollTokens.TEXT_MUTED() : RerollTokens.TEXT_DISABLED());
 			String condition = state.stopCondition() == AutoRerollEngine.StopCondition.ANY ? "any" : "all";
-			font.draw(poseStack, condition, x + w - 22, y + 3, chipColor);
+			font.draw(poseStack, condition, x + w - 22, y + RerollPanelLayout.TEXT_BASELINE_OFFSET, chipColor);
 		}
 	}
 

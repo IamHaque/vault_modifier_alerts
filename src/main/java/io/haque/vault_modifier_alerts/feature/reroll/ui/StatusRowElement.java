@@ -17,11 +17,16 @@ import net.minecraft.world.item.TooltipFlag;
  * Status row element for the auto-reroll panel. Delegates text/color
  * computation to {@link RerollPanel#computeStatusInfo} and renders the
  * truncated label with declarative tooltip when the text overflows.
+ * Debounces rapid state changes to prevent flickering (§7 Design Guidelines).
  */
 public class StatusRowElement extends ContainerElement<StatusRowElement> {
 
+	private static final int DEBOUNCE_FRAMES = 5;
+
 	private Font font;
 	private RerollPanel.StatusInfo lastInfo;
+	private String cachedText = "";
+	private int frameCounter;
 
 	public StatusRowElement(int x, int y, int width) {
 		super(Spatials.size(width, RerollPanelLayout.ROW_H));
@@ -39,13 +44,27 @@ public class StatusRowElement extends ContainerElement<StatusRowElement> {
 		}
 		VaultArtisanStationScreen screen = (VaultArtisanStationScreen) Minecraft.getInstance().screen;
 		RerollPanel.StatusInfo info = panel.computeStatusInfo(panel.operations(screen));
-		lastInfo = info;
+		// Debounce: only update displayed text when it actually changes or after N frames
+		if (!info.text().equals(cachedText)) {
+			frameCounter++;
+			if (frameCounter >= DEBOUNCE_FRAMES) {
+				cachedText = info.text();
+				lastInfo = info;
+				frameCounter = 0;
+			}
+		} else {
+			lastInfo = info;
+			frameCounter = 0;
+		}
+		if (lastInfo == null) {
+			return;
+		}
 		int maxChars = (width() - RerollPanelLayout.PAD_X * 2) / 7;
-		String display = info.text();
+		String display = lastInfo.text();
 		if (display.length() > maxChars) {
 			display = RerollPanel.truncate(display, maxChars);
 		}
-		font.draw(poseStack, display, x() + RerollPanelLayout.PAD_X, y() + 3, info.color());
+		font.draw(poseStack, display, x() + RerollPanelLayout.PAD_X, y() + RerollPanelLayout.TEXT_BASELINE_OFFSET, lastInfo.color());
 	}
 
 	@Override

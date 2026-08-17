@@ -69,35 +69,35 @@ final class DropdownItemRowElement extends AbstractSpatialElement<DropdownItemRo
 
 		if (hovered) {
 			GuiComponent.fill(poseStack, x(), y(), x() + width(), y() + height(),
-					removeZone ? RerollTokens.DROPDOWN_REMOVE_HOVER : RerollTokens.ROW_HOVER);
+					removeZone ? RerollTokens.DROPDOWN_REMOVE_HOVER : RerollTokens.ROW_HOVER());
 		}
 
 		int baseColor = current ? RerollTokens.ACCENT_GOLD()
-				: (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED);
+				: (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED());
 
 		if (current || (!operationDropdown && !targetDropdown && dropdown.isWatchedItem(index))) {
 			font.draw(poseStack, operationDropdown || targetDropdown ? ">" : "*",
-					x() + 2, y() + 3, RerollTokens.ACCENT_GOLD());
+					x() + 2, y() + RerollPanelLayout.TEXT_BASELINE_OFFSET, RerollTokens.ACCENT_GOLD());
 		}
 
 		if (targetDropdown && AutoRerollEngine.getInstance().isRunning() && index < state.targets().size()) {
 			boolean met = AutoRerollEngine.getInstance().isMet(index);
-			font.draw(poseStack, met ? "[x]" : "[ ]", x() + 2, y() + 3,
+			font.draw(poseStack, met ? "[x]" : "[ ]", x() + 2, y() + RerollPanelLayout.TEXT_BASELINE_OFFSET,
 					met ? RerollTokens.STATE_SUCCESS() : RerollTokens.STATE_DANGER());
 		}
 
 		int rangeWidth = range.isEmpty() ? 0 : font.width(range);
 		int nameMax = x() + width() - RerollPanelLayout.PAD_X - rangeWidth - 8;
 		String shownName = RerollPanel.truncate(name, Math.max(8, (nameMax - x()) / 7));
-		font.draw(poseStack, shownName, x() + 11, y() + 3, baseColor);
+		font.draw(poseStack, shownName, x() + 11, y() + RerollPanelLayout.TEXT_BASELINE_OFFSET, baseColor);
 
 		if (!range.isEmpty() && !removeZone) {
 			int rangeX = x() + width() - RerollPanelLayout.PAD_X;
-			font.draw(poseStack, range, rangeX - font.width(range), y() + 3, RerollTokens.TEXT_MUTED);
+			font.draw(poseStack, range, rangeX - font.width(range), y() + RerollPanelLayout.TEXT_BASELINE_OFFSET, RerollTokens.TEXT_MUTED());
 		}
 
 		if (removeZone) {
-			font.draw(poseStack, "x", x() + width() - 12, y() + 3, RerollTokens.STATE_DANGER());
+			font.draw(poseStack, "x", x() + width() - 12, y() + RerollPanelLayout.TEXT_BASELINE_OFFSET, RerollTokens.STATE_DANGER());
 		}
 	}
 

@@ -43,7 +43,7 @@ public class RangeRowElement extends ContainerElement<RangeRowElement> {
 		String text = range.numeric() ? "Range: " + range.displayText() : "Range: ?";
 		int maxChars = (width() - RerollPanelLayout.PAD_X * 2) / 7;
 		String shown = text.length() > maxChars ? RerollPanel.truncate(text, maxChars) : text;
-		font.draw(poseStack, shown, x() + RerollPanelLayout.PAD_X, y() + 3, RerollTokens.TEXT_MUTED);
+		font.draw(poseStack, shown, x() + RerollPanelLayout.PAD_X, y() + RerollPanelLayout.TEXT_BASELINE_OFFSET, RerollTokens.TEXT_MUTED());
 	}
 
 	@Override

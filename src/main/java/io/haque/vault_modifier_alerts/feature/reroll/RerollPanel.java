@@ -1,5 +1,6 @@
 package io.haque.vault_modifier_alerts.feature.reroll;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.haque.vault_modifier_alerts.config.VmaClientConfigs;
 import io.haque.vault_modifier_alerts.feature.reroll.AutoRerollEngine.StopReason;
@@ -14,8 +15,11 @@ import iskallia.vault.client.gui.screen.block.VaultArtisanStationScreen;
 import iskallia.vault.container.VaultArtisanStationContainer;
 import iskallia.vault.gear.crafting.VaultGearCraftingHelper;
 import iskallia.vault.gear.modification.GearModificationAction;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
@@ -319,10 +323,13 @@ public final class RerollPanel {
 		RerollPanelLayout layout = computeLayout(x, y);
 
 		drawPanelFrame(poseStack, layout);
-		drawCentered(poseStack, "Auto-Reroll", x + width / 2, y + 4, RerollTokens.ACCENT_GOLD());
+		MutableComponent title = new TextComponent("Auto-Reroll").withStyle(ChatFormatting.BOLD);
+		RenderSystem.disableDepthTest();
+		font().draw(poseStack, title, x + width / 2.0F - font().width(title) / 2.0F, y + 4, RerollTokens.ACCENT_GOLD());
+		RenderSystem.enableDepthTest();
 
 		if (operation == null) {
-			drawString(poseStack, "No re-roll actions", x + RerollPanelLayout.PAD_X, layout.focusY + 3, RerollTokens.STATE_DANGER());
+			drawString(poseStack, "No re-roll actions", x + RerollPanelLayout.PAD_X, layout.focusY + RerollPanelLayout.TEXT_BASELINE_OFFSET, RerollTokens.STATE_DANGER());
 			return;
 		}
 
@@ -378,6 +385,7 @@ public final class RerollPanel {
 	// helpers
 
 	private void drawPanelFrame(PoseStack poseStack, RerollPanelLayout layout) {
+		RenderSystem.enableBlend();
 		GuiComponent.fill(poseStack, layout.x, layout.y, layout.x + layout.width,
 				layout.y + layout.totalHeight, RerollTokens.PANEL_BG());
 		GuiComponent.fill(poseStack, layout.x, layout.y, layout.x + layout.width, layout.y + 2, RerollTokens.ACCENT_GOLD());
@@ -386,6 +394,8 @@ public final class RerollPanel {
 		GuiComponent.fill(poseStack, layout.x, layout.y + 2, layout.x + 1, layout.y + layout.totalHeight, RerollTokens.PANEL_BORDER());
 		GuiComponent.fill(poseStack, layout.x + layout.width - 1, layout.y + 2,
 				layout.x + layout.width, layout.y + layout.totalHeight, RerollTokens.PANEL_BORDER());
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+		RenderSystem.disableBlend();
 	}
 
 
@@ -397,7 +407,7 @@ public final class RerollPanel {
 				&& mouseX >= layout.minFieldLeft() && mouseX < layout.minFieldRight();
 		boolean hasThreshold = hasTarget
 				&& state.targets().get(state.focusedTarget()).thresholdEnabled();
-		drawString(poseStack, "Min", x + 22, layout.minY + 3, RerollTokens.TEXT_MUTED);
+		drawString(poseStack, "Min", x + RerollPanelLayout.MIN_LABEL_X, layout.minY + RerollPanelLayout.TEXT_BASELINE_OFFSET, RerollTokens.TEXT_MUTED());
 		if (state.isMinInputFocused() || hasThreshold) {
 			GuiComponent.fill(poseStack, layout.minFieldLeft(), layout.minY, layout.minFieldRight(),
 					layout.minY + RerollPanelLayout.ROW_H,
@@ -414,9 +424,9 @@ public final class RerollPanel {
 		} else {
 			shown = "any";
 		}
-		drawString(poseStack, shown, layout.minFieldLeft() + 2, layout.minY + 3, hasTarget
+		drawString(poseStack, shown, layout.minFieldLeft() + 2, layout.minY + RerollPanelLayout.TEXT_BASELINE_OFFSET, hasTarget
 				? (hoveredField && !state.isMinInputFocused() ? RerollTokens.ACCENT_GOLD() : RerollTokens.TEXT_DEFAULT())
-				: RerollTokens.TEXT_DISABLED);
+				: RerollTokens.TEXT_DISABLED());
 	}
 
 	private void drawPotentialRow(PoseStack poseStack, RerollPanelLayout layout, int x, int width,
@@ -427,10 +437,10 @@ public final class RerollPanel {
 		int cost = potentialCost(gear, operation);
 		String left = "Potential " + potential + "/" + max;
 		String right = cost > 0 && potential >= cost ? "~" + potential / cost + " rolls" : "";
-		int color = potential > 0 ? (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED) : RerollTokens.STATE_DANGER();
-		drawString(poseStack, left, x + RerollPanelLayout.PAD_X, layout.potentialY + 3, color);
+		int color = potential > 0 ? (VmaClientConfigs.isAutoRerollEnabled() ? RerollTokens.TEXT_DEFAULT() : RerollTokens.TEXT_DISABLED()) : RerollTokens.STATE_DANGER();
+		drawString(poseStack, left, x + RerollPanelLayout.PAD_X, layout.potentialY + RerollPanelLayout.TEXT_BASELINE_OFFSET, color);
 		if (!right.isEmpty()) {
-			drawRight(poseStack, right, x + width - RerollPanelLayout.PAD_X, layout.potentialY + 3, RerollTokens.TEXT_MUTED);
+			drawRight(poseStack, right, x + width - RerollPanelLayout.PAD_X, layout.potentialY + RerollPanelLayout.TEXT_BASELINE_OFFSET, RerollTokens.TEXT_MUTED());
 		}
 	}
 
@@ -535,15 +545,21 @@ public final class RerollPanel {
 	}
 
 	static void drawString(PoseStack poseStack, String text, int x, int y, int color) {
+		RenderSystem.disableDepthTest();
 		font().draw(poseStack, text, x, y, color);
+		RenderSystem.enableDepthTest();
 	}
 
 	static void drawCentered(PoseStack poseStack, String text, int centerX, int y, int color) {
+		RenderSystem.disableDepthTest();
 		font().draw(poseStack, text, centerX - font().width(text) / 2.0F, y, color);
+		RenderSystem.enableDepthTest();
 	}
 
 	static void drawRight(PoseStack poseStack, String text, int rightX, int y, int color) {
+		RenderSystem.disableDepthTest();
 		font().draw(poseStack, text, rightX - font().width(text), y, color);
+		RenderSystem.enableDepthTest();
 	}
 
 	public record StatusInfo(String text, int color, String full) {
@@ -590,19 +606,19 @@ public final class RerollPanel {
 			full = text;
 		} else if (!VmaClientConfigs.isAutoRerollEnabled()) {
 			text = "Auto-reroll disabled";
-			color = RerollTokens.TEXT_DISABLED;
+			color = RerollTokens.TEXT_DISABLED();
 			full = text;
 		} else if (gear.isEmpty()) {
 			text = "No gear in station";
-			color = RerollTokens.TEXT_MUTED;
+			color = RerollTokens.TEXT_MUTED();
 			full = text;
 		} else if (noCandidates) {
 			text = "No rollable modifiers";
-			color = RerollTokens.TEXT_MUTED;
+			color = RerollTokens.TEXT_MUTED();
 			full = text;
 		} else if (state.targets().isEmpty()) {
 			text = "Add a target modifier";
-			color = RerollTokens.TEXT_MUTED;
+			color = RerollTokens.TEXT_MUTED();
 			full = text;
 		} else if (state.targets().size() == 1 && state.focusedTarget() >= 0
 				&& state.focusedTarget() < state.targets().size()
