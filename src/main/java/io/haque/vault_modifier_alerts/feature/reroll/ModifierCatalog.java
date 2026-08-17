@@ -441,6 +441,9 @@ public final class ModifierCatalog {
 			if (config instanceof TalentLevelAttribute.Config talentConfig) {
 				return talentDisplayName(talentConfig.getTalent());
 			}
+			if (config instanceof iskallia.vault.gear.attribute.custom.effect.EffectCloudAttribute.CloudConfig) {
+				return cloudDisplayName(tierGroup.getIdentifier().getPath());
+			}
 			break;
 		}
 		if (attribute == null || attribute.getReader() == null) {
@@ -479,6 +482,19 @@ public final class ModifierCatalog {
 				.map(Skill::getName)
 				.filter(name -> name != null && !name.isBlank())
 				.orElseGet(() -> humanizeId(trimValueSuffix(talentKey)));
+	}
+
+	/**
+	 * Effect cloud display name derived from the identifier path:
+	 * mod_healing_cloud → "Healing Cloud", crafted_fear_cloud → "Crafted Fear Cloud".
+	 * regencloud is a manual mapping ("Healing Cloud") because its identifier
+	 * humanizes to "Regencloud" which reads poorly.
+	 */
+	private static String cloudDisplayName(String path) {
+		if ("regencloud".equals(path)) {
+			return "Healing Cloud";
+		}
+		return humanizeId(stripModPrefix(path));
 	}
 
 	/** Ability keys like "Ice_Bolt_Base" end in a base-class tag that reads badly. */
